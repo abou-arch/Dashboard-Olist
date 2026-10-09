@@ -6,10 +6,10 @@ import streamlit as st
 from olist_dashboard import charts, metrics
 from olist_dashboard import formatting as fmt
 from olist_dashboard.config import RELIABLE_END, RELIABLE_START
-from olist_dashboard.data import load_tables
+from olist_dashboard.data import load_tables, processed_tables_exist
 
 
-@st.cache_data(show_spinner="Chargement des données…")
+@st.cache_data(show_spinner=False)
 def get_tables() -> dict[str, pd.DataFrame]:
     return load_tables()
 
@@ -32,11 +32,22 @@ def absolute_delta(current: float | None, previous: float | None, unit: str = ""
     return f"{fmt.number(current - previous, 2, signed=True)}{unit}"
 
 
-tables = get_tables()
-orders, items = tables["orders"], tables["items"]
-
 st.title("Vue d'ensemble")
 st.caption("Olist, place de marché e-commerce brésilienne. Montants en réais (R$).")
+
+spinner_text = (
+    "Chargement des données…"
+    if processed_tables_exist()
+    else "Premier lancement : construction des tables à partir des CSV de data/raw/ "
+    "(cela peut prendre jusqu'à une minute)…"
+)
+try:
+    with st.spinner(spinner_text):
+        tables = get_tables()
+except FileNotFoundError as error:
+    st.error(str(error), icon=":material/folder_off:")
+    st.stop()
+orders, items = tables["orders"], tables["items"]
 
 # --- Filtres -----------------------------------------------------------------
 min_day = orders["purchase_date"].min().date()

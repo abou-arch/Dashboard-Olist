@@ -159,11 +159,17 @@ def write_processed(tables: dict[str, pd.DataFrame], out_dir: Path = PROCESSED_D
         df.to_parquet(out_dir / f"{name}.parquet", index=False)
 
 
+TABLE_NAMES = ("orders", "items")
+
+
+def processed_tables_exist(processed_dir: Path = PROCESSED_DIR) -> bool:
+    return all((processed_dir / f"{name}.parquet").exists() for name in TABLE_NAMES)
+
+
 def load_tables(
     processed_dir: Path = PROCESSED_DIR, raw_dir: Path = RAW_DIR
 ) -> dict[str, pd.DataFrame]:
     """Charge les tables Parquet, en les (re)construisant depuis les CSV si besoin."""
-    paths = {name: processed_dir / f"{name}.parquet" for name in ("orders", "items")}
-    if not all(path.exists() for path in paths.values()):
+    if not processed_tables_exist(processed_dir):
         write_processed(build_tables(load_raw(raw_dir)), processed_dir)
-    return {name: pd.read_parquet(path) for name, path in paths.items()}
+    return {name: pd.read_parquet(processed_dir / f"{name}.parquet") for name in TABLE_NAMES}
