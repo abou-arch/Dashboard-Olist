@@ -1,0 +1,11 @@
+# Données (non versionnées : voir README)
+data/
+
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Streamlit
+.streamlit/secrets.toml
