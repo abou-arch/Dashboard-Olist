@@ -348,3 +348,115 @@ def review_by_category(orders: pd.DataFrame, items: pd.DataFrame) -> pd.DataFram
 def min_reviews_for_ranking(n_reviews: int) -> int:
     """Nombre d'avis minimum pour classer une catégorie (0,3 % des avis, au moins 20)."""
     return max(20, round(n_reviews * 0.003))
+
+
+# --- Vendeurs et catégories --------------------------------------------------
+
+
+def _with_outcomes(items: pd.DataFrame, orders: pd.DataFrame, key: str) -> pd.DataFrame:
+    """Couples (``key``, commande) distincts, avec la note et le retard de la commande.
+
+    La note et le retard concernent toute la commande : une commande de
+    plusieurs vendeurs (≈ 1 %) compte pour chacun d'eux.
+    """
+    pairs = items[[key, "order_id"]].drop_duplicates()
+    outcomes = orders.set_index("order_id")[["review_score", "is_late"]]
+    return pairs.join(outcomes, on="order_id")
+
+
+def _late_rate(series: pd.Series) -> float:
+    return series.dropna().astype("float").mean()
+
+
+def seller_stats(orders: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
+    """Indicateurs par vendeur, du plus gros CA au plus petit."""
+    sales = sold(items)
+    sales = sales.assign(revenue=sales["price"] + sales["freight_value"])
+    out = sales.groupby("seller_id").agg(
+        seller_state=("seller_state", "first"),
+        revenue=("revenue", "sum"),
+        orders=("order_id", "nunique"),
+        items=("order_id", "count"),
+        average_price=("price", "mean"),
+    )
+    outcomes = _with_outcomes(sales, orders, "seller_id").groupby("seller_id").agg(
+        review_score=("review_score", "mean"), late_rate=("is_late", _late_rate)
+    )
+    out = out.join(outcomes)
+    return out.sort_values("revenue", ascending=False).reset_index()
+
+
+def top_share(sellers: pd.DataFrame, fraction: float) -> float | None:
+    """Part du CA réalisée par la fraction ``fraction`` des vendeurs les plus gros."""
+    if sellers.empty or not sellers["revenue"].sum():
+        return None
+    n = max(1, int(np.ceil(len(sellers) * fraction)))
+    revenue = sellers["revenue"].sort_values(ascending=False)
+    return float(revenue.head(n).sum() / revenue.sum())
+
+
+@dataclass(frozen=True)
+class SellerKpis:
+    active_sellers: int
+    median_revenue: float | None
+    top10_share: float | None
+    small_seller_share: float | None
+    categories: int
+    average_item_price: float | None
+
+
+SMALL_SELLER_ORDERS = 10
+
+
+def compute_seller_kpis(orders: pd.DataFrame, items: pd.DataFrame) -> SellerKpis:
+    sellers = seller_stats(orders, items)
+    sales = sold(items)
+    return SellerKpis(
+        active_sellers=len(sellers),
+        median_revenue=_median(sellers["revenue"]),
+        top10_share=top_share(sellers, 0.10),
+        small_seller_share=_mean((sellers["orders"] < SMALL_SELLER_ORDERS).astype("float")),
+        categories=int(sales["category"].nunique()),
+        average_item_price=_mean(sales["price"]),
+    )
+
+
+def concentration_curve(sellers: pd.DataFrame, points: int = 200) -> pd.DataFrame:
+    """Part cumulée du CA selon la part des vendeurs, du plus gros au plus petit."""
+    revenue = sellers["revenue"].sort_values(ascending=False).to_numpy()
+    if not len(revenue) or not revenue.sum():
+        return pd.DataFrame({"seller_share": [], "revenue_share": []})
+    cumulative = np.concatenate([[0.0], np.cumsum(revenue) / revenue.sum()])
+    seller_share = np.arange(len(cumulative)) / len(revenue)
+    keep = np.unique(np.linspace(0, len(cumulative) - 1, min(points, len(cumulative))).round().astype(int))
+    return pd.DataFrame({"seller_share": seller_share[keep], "revenue_share": cumulative[keep]})
+
+
+def revenue_by_seller_state(items: pd.DataFrame, top: int = 10) -> pd.DataFrame:
+    sales = sold(items)
+    sales = sales.assign(revenue=sales["price"] + sales["freight_value"])
+    out = sales.groupby("seller_state").agg(
+        revenue=("revenue", "sum"), sellers=("seller_id", "nunique")
+    )
+    out["share"] = out["revenue"] / out["revenue"].sum()
+    return out.sort_values("revenue", ascending=False).head(top).reset_index()
+
+
+def category_stats(orders: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
+    """Indicateurs par catégorie de produit, du plus gros CA au plus petit."""
+    sales = sold(items)
+    sales = sales.assign(revenue=sales["price"] + sales["freight_value"])
+    out = sales.groupby("category").agg(
+        revenue=("revenue", "sum"),
+        orders=("order_id", "nunique"),
+        sellers=("seller_id", "nunique"),
+        average_price=("price", "mean"),
+    )
+    out["share"] = out["revenue"] / out["revenue"].sum()
+    outcomes = _with_outcomes(sales, orders, "category").groupby("category").agg(
+        review_score=("review_score", "mean"),
+        reviews=("review_score", "count"),
+        late_rate=("is_late", _late_rate),
+    )
+    out = out.join(outcomes)
+    return out.sort_values("revenue", ascending=False).reset_index()

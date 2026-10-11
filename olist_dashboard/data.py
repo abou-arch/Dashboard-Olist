@@ -52,6 +52,7 @@ def load_raw(raw_dir: Path = RAW_DIR) -> dict[str, pd.DataFrame]:
         "items": read("items", parse_dates=["shipping_limit_date"]),
         "customers": read("customers", dtype=zip_dtype),
         "products": read("products"),
+        "sellers": read("sellers", dtype={"seller_zip_code_prefix": "string"}),
         "reviews": read("reviews", parse_dates=["review_creation_date", "review_answer_timestamp"]),
         "translation": read("translation"),
     }
@@ -98,6 +99,7 @@ ITEM_COLUMNS = [
     "order_item_id",
     "product_id",
     "seller_id",
+    "seller_state",
     "category",
     "price",
     "freight_value",
@@ -154,10 +156,17 @@ def build_orders(
     return df[ORDER_COLUMNS].sort_values("purchase_date", ignore_index=True)
 
 
-def build_items(items: pd.DataFrame, orders: pd.DataFrame, categories: pd.Series) -> pd.DataFrame:
-    """Table au grain article, avec le contexte de la commande."""
+def build_items(
+    items: pd.DataFrame, orders: pd.DataFrame, categories: pd.Series, sellers: pd.DataFrame
+) -> pd.DataFrame:
+    """Table au grain article, avec le contexte de la commande et du vendeur."""
     context = orders.set_index("order_id")[["purchase_date", "order_status", "customer_state"]]
-    df = items.join(context, on="order_id").join(categories, on="product_id")
+    seller_states = sellers.set_index("seller_id")["seller_state"]
+    df = (
+        items.join(context, on="order_id")
+        .join(categories, on="product_id")
+        .join(seller_states, on="seller_id")
+    )
     df["category"] = df["category"].fillna(UNKNOWN_CATEGORY)
     return df[ITEM_COLUMNS].sort_values(
         ["purchase_date", "order_id", "order_item_id"], ignore_index=True
@@ -167,7 +176,7 @@ def build_items(items: pd.DataFrame, orders: pd.DataFrame, categories: pd.Series
 def build_tables(raw: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"])
     categories = build_categories(raw["products"], raw["translation"])
-    items = build_items(raw["items"], orders, categories)
+    items = build_items(raw["items"], orders, categories, raw["sellers"])
     return {"orders": orders, "items": items}
 
 

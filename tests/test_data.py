@@ -63,6 +63,7 @@ def raw():
             "product_category_name": ["beleza_saude", "pc_gamer", None],
         }
     )
+    sellers = pd.DataFrame({"seller_id": ["s1", "s2"], "seller_state": ["SP", "PR"]})
     translation = pd.DataFrame(
         {
             "product_category_name": ["beleza_saude"],
@@ -71,7 +72,7 @@ def raw():
     )
     return dict(
         orders=orders, items=items, customers=customers,
-        reviews=reviews, products=products, translation=translation,
+        reviews=reviews, products=products, sellers=sellers, translation=translation,
     )
 
 
@@ -109,8 +110,9 @@ def test_build_orders_delivery(raw):
 def test_build_items_adds_order_context(raw):
     orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"])
     categories = build_categories(raw["products"], raw["translation"])
-    items = build_items(raw["items"], orders, categories)
+    items = build_items(raw["items"], orders, categories, raw["sellers"])
     assert len(items) == 3
+    assert items["seller_state"].tolist() == ["SP", "SP", "PR"]
     first = items.iloc[0]
     assert first["category"] == "Health beauty"
     assert first["customer_state"] == "SP"

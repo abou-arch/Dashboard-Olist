@@ -202,3 +202,100 @@ def horizontal_bar_chart(
     fig.update_layout(bargap=0.3, margin=dict(r=72))
     return fig
 
+
+
+def concentration_chart(
+    curve: pd.DataFrame, p: Palette, highlight: tuple[float, float] | None = None
+) -> go.Figure:
+    """Courbe de concentration : part cumulée du CA selon la part des vendeurs.
+
+    La diagonale grise figure une répartition parfaitement égale ; ``highlight``
+    (part des vendeurs, part du CA) marque et légende un point de la courbe.
+    """
+    fig = go.Figure()
+    fig.add_scatter(
+        x=[0, 1], y=[0, 1], mode="lines", hoverinfo="skip",
+        line=dict(color=p.baseline, width=1),
+    )
+    fig.add_scatter(
+        x=curve["seller_share"],
+        y=curve["revenue_share"],
+        mode="lines",
+        line=dict(color=p.accent, width=2),
+        fill="tozeroy",
+        fillcolor=p.accent_wash,
+        hovertemplate="%{x:.0%} des vendeurs font %{y:.0%} du CA<extra></extra>",
+    )
+    if highlight:
+        x, y = highlight
+        fig.add_scatter(
+            x=[x], y=[y], mode="markers+text",
+            marker=dict(size=10, color=p.accent, line=dict(width=2, color=p.surface)),
+            text=[f"{x:.0%} des vendeurs → {y:.0%} du CA".replace(".", ",")],
+            textposition="middle right",
+            textfont=dict(color=p.text_primary),
+            hoverinfo="skip",
+        )
+    fig.add_annotation(
+        x=0.72, y=0.62, text="répartition égale", showarrow=False,
+        font=dict(color=p.muted, size=12), textangle=-38,
+    )
+    _base_layout(fig, p, height=320)
+    fig.update_xaxes(tickformat=".0%", range=[0, 1], showgrid=False, title="Part des vendeurs")
+    fig.update_yaxes(tickformat=".0%", range=[0, 1.02], title="Part du CA")
+    fig.update_xaxes(title_font=dict(color=p.muted, size=12))
+    fig.update_yaxes(title_font=dict(color=p.muted, size=12))
+    fig.update_layout(hovermode="closest")
+    return fig
+
+
+def scatter_chart(
+    df: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    label_col: str,
+    p: Palette,
+    hovertemplate: str,
+    customdata_cols: tuple[str, ...] = (),
+    labeled: int = 0,
+    x_log: bool = False,
+    y_reference: tuple[float, str] | None = None,
+    x_axis: dict | None = None,
+    y_axis: dict | None = None,
+) -> go.Figure:
+    """Nuage de points d'une seule série.
+
+    Les ``labeled`` premières lignes de ``df`` reçoivent une étiquette, placée
+    alternativement au-dessus et en dessous du point pour limiter les
+    chevauchements ; ``y_reference`` (valeur, libellé) trace une ligne de repère.
+    """
+    labels = [name if i < labeled else "" for i, name in enumerate(df[label_col])]
+    positions = ["top center" if i % 2 == 0 else "bottom center" for i in range(len(df))]
+    fig = go.Figure(
+        go.Scatter(
+            x=df[x_col],
+            y=df[y_col],
+            mode="markers+text",
+            text=labels,
+            textposition=positions,
+            textfont=dict(color=p.text_secondary, size=12),
+            marker=dict(size=10, color=p.accent, line=dict(width=2, color=p.surface)),
+            customdata=df[[label_col, *customdata_cols]].to_numpy(),
+            hovertemplate=hovertemplate + "<extra></extra>",
+            cliponaxis=False,
+        )
+    )
+    if y_reference:
+        value, text = y_reference
+        fig.add_hline(
+            y=value, line=dict(color=p.baseline, width=1),
+            annotation=dict(text=text, font=dict(color=p.muted, size=12)),
+            annotation_position="bottom left",
+        )
+    _base_layout(fig, p, height=420)
+    fig.update_xaxes(type="log" if x_log else "linear", showgrid=False, **(x_axis or {}))
+    fig.update_yaxes(**(y_axis or {}))
+    fig.update_xaxes(title_font=dict(color=p.muted, size=12))
+    fig.update_yaxes(title_font=dict(color=p.muted, size=12))
+    fig.update_layout(hovermode="closest", margin=dict(t=24))
+    return fig

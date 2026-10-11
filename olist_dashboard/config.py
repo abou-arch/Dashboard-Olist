@@ -13,6 +13,7 @@ RAW_FILES = {
     "items": "olist_order_items_dataset.csv",
     "customers": "olist_customers_dataset.csv",
     "products": "olist_products_dataset.csv",
+    "sellers": "olist_sellers_dataset.csv",
     "reviews": "olist_order_reviews_dataset.csv",
     "translation": "product_category_name_translation.csv",
 }

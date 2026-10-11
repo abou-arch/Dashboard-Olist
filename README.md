@@ -11,6 +11,7 @@ environ 100 000 commandes passées entre 2016 et 2018.
 | Vue d'ensemble | CA, commandes, panier moyen, note moyenne, taux de retard, délai de livraison, comparés à la période précédente ; CA mensuel ; top 10 des catégories et des États |
 | Logistique | Délai de livraison, taux et durée des retards, avance sur la date estimée, préparation vendeur, part du port ; note client selon le retard ; taux de retard mensuel ; délai par étape ; délai et retard par État |
 | Satisfaction | Note moyenne, clients satisfaits et insatisfaits, avis commentés ; répartition des notes ; note mensuelle ; note selon la livraison et le nombre d'articles ; catégories les moins et les mieux notées |
+| Vendeurs et catégories | Vendeurs actifs, CA médian, concentration des ventes, petits vendeurs, prix moyen ; courbe de concentration ; CA par État du vendeur ; CA et note par catégorie ; plus gros vendeurs et vendeurs à surveiller |
 
 Filtres : période d'achat et États du client, conservés d'une page à l'autre.
 
@@ -55,6 +56,7 @@ app.py                     point d'entrée Streamlit (navigation)
 views/overview.py          page « Vue d'ensemble »
 views/logistics.py         page « Logistique »
 views/satisfaction.py      page « Satisfaction »
+views/sellers.py           page « Vendeurs et catégories »
 olist_dashboard/
   config.py                chemins et règles métier
   data.py                  CSV bruts -> tables orders / items (Parquet)
@@ -89,6 +91,11 @@ tests/                     tests unitaires (pytest)
   Les commandes aux dates manquantes ou dans le désordre (environ 1,5 % des
   livraisons) sont écartées de ce calcul.
 - **Part du port** : frais de port / chiffre d'affaires, hors commandes annulées.
+- **CA d'un vendeur ou d'une catégorie** : prix + port de ses articles vendus.
+  Sa note et son taux de retard sont ceux des commandes où il apparaît ; une
+  commande de plusieurs vendeurs (environ 1 %) compte pour chacun.
+- **Vendeurs à surveiller** : les moins bien notés parmi ceux qui ont au moins
+  30 commandes sur la période.
 - **Période représentative** : de janvier 2017 à août 2018. Avant et après, le jeu de
   données ne contient que quelques centaines de commandes ; c'est la période par
   défaut, et aucune comparaison n'est affichée si la période précédente en sort.
