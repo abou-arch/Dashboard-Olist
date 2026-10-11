@@ -7,8 +7,7 @@ from olist_dashboard import charts, metrics, ui
 from olist_dashboard import formatting as fmt
 from olist_dashboard.ui import point_delta, relative_delta
 
-# Nombre de commandes minimum pour juger la note et les retards d'un vendeur.
-WATCH_MIN_ORDERS = 30
+WATCH_MIN_ORDERS = metrics.WATCH_MIN_ORDERS
 
 
 def short_id(seller_id: str) -> str:
@@ -46,7 +45,7 @@ prev = None
 if selection.previous_orders is not None:
     prev_items = items[items["order_id"].isin(selection.previous_orders["order_id"])]
     prev = metrics.compute_seller_kpis(selection.previous_orders, prev_items)
-note = selection.delta_note
+note = ui.delta_note(selection)
 if kpis.active_sellers == 0:
     st.warning("Aucune vente pour ces filtres.")
     st.stop()

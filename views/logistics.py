@@ -24,7 +24,7 @@ prev = (
     if selection.previous_orders is not None
     else None
 )
-note = selection.delta_note
+note = ui.delta_note(selection)
 if kpis.delivered == 0:
     st.warning("Aucune commande livrée pour ces filtres.")
     st.stop()

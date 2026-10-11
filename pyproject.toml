@@ -1,3 +1,7 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+    # Avertissement interne au client de test de Starlette (httpx), sans effet sur l'app.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

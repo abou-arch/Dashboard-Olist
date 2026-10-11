@@ -1,15 +1,14 @@
 """Éléments Streamlit communs à toutes les pages : données, filtres, écarts, graphiques."""
 
-from dataclasses import dataclass
-
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from olist_dashboard import charts, metrics
+from olist_dashboard import charts
 from olist_dashboard import formatting as fmt
 from olist_dashboard.config import RELIABLE_END, RELIABLE_START
 from olist_dashboard.data import load_tables, processed_tables_exist
+from olist_dashboard.selection import Selection, select
 
 
 @st.cache_data(show_spinner=False)
@@ -31,17 +30,6 @@ def load_data() -> dict[str, pd.DataFrame]:
     except FileNotFoundError as error:
         st.error(str(error), icon=":material/folder_off:")
         st.stop()
-
-
-@dataclass(frozen=True)
-class Selection:
-    start: pd.Timestamp
-    end: pd.Timestamp
-    states: list[str]
-    orders: pd.DataFrame
-    # Même sélection sur la période précédente, si elle reste dans la plage représentative.
-    previous_orders: pd.DataFrame | None
-    delta_note: str | None
 
 
 def _keep(key: str) -> None:
@@ -83,24 +71,18 @@ def filter_bar(orders: pd.DataFrame) -> Selection:
         st.info("Choisissez une date de fin pour la période.")
         st.stop()
 
-    start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-    current = metrics.filter_orders(orders, start, end, states)
-    if current.empty:
+    selection = select(orders, pd.Timestamp(period[0]), pd.Timestamp(period[1]), states)
+    if selection.orders.empty:
         st.warning("Aucune commande pour ces filtres.")
         st.stop()
+    return selection
 
-    prev_start, prev_end = metrics.previous_period(start, end)
-    has_previous = prev_start >= RELIABLE_START
-    return Selection(
-        start=start,
-        end=end,
-        states=states,
-        orders=current,
-        previous_orders=(
-            metrics.filter_orders(orders, prev_start, prev_end, states) if has_previous else None
-        ),
-        delta_note=f"vs {prev_start:%d/%m/%Y} – {prev_end:%d/%m/%Y}" if has_previous else None,
-    )
+
+def delta_note(selection: Selection) -> str | None:
+    """Libellé de la période de comparaison, pour les indicateurs."""
+    if selection.previous_start is None:
+        return None
+    return f"vs {selection.previous_start:%d/%m/%Y} – {selection.previous_end:%d/%m/%Y}"
 
 
 def no_comparison_caption(selection: Selection) -> None:

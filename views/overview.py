@@ -20,7 +20,7 @@ prev = (
     if selection.previous_orders is not None
     else None
 )
-delta_note = selection.delta_note
+delta_note = ui.delta_note(selection)
 
 # --- KPI ---------------------------------------------------------------------
 monthly = metrics.monthly_sales(current)

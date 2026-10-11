@@ -40,7 +40,7 @@ prev = (
     if selection.previous_orders is not None
     else None
 )
-note = selection.delta_note
+note = ui.delta_note(selection)
 if kpis.reviewed == 0:
     st.warning("Aucun avis pour ces filtres.")
     st.stop()

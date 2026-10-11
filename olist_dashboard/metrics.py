@@ -406,6 +406,8 @@ class SellerKpis:
 
 
 SMALL_SELLER_ORDERS = 10
+# Nombre de commandes minimum pour juger la note et les retards d'un vendeur.
+WATCH_MIN_ORDERS = 30
 
 
 def compute_seller_kpis(orders: pd.DataFrame, items: pd.DataFrame) -> SellerKpis:
