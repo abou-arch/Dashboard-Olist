@@ -88,6 +88,7 @@ ORDER_COLUMNS = [
     "freight_value",
     "revenue",
     "review_score",
+    "has_comment",
     "delivery_days",
     "delay_days",
     "is_late",
@@ -119,8 +120,14 @@ def build_orders(
         freight_value=("freight_value", "sum"),
         n_items=("order_item_id", "count"),
     )
-    # Une commande peut avoir plusieurs avis : on garde la note moyenne.
-    scores = reviews.groupby("order_id")["review_score"].mean().rename("review_score")
+    # Une commande peut avoir plusieurs avis : on garde la note moyenne, et on
+    # considère qu'elle est commentée si l'un des avis contient un message.
+    reviews = reviews.assign(
+        has_comment=reviews["review_comment_message"].fillna("").str.strip().ne("")
+    )
+    scores = reviews.groupby("order_id").agg(
+        review_score=("review_score", "mean"), has_comment=("has_comment", "any")
+    )
     clients = customers.set_index("customer_id")[
         ["customer_unique_id", "customer_city", "customer_state"]
     ]
@@ -132,6 +139,7 @@ def build_orders(
     )
     df[["items_value", "freight_value"]] = df[["items_value", "freight_value"]].fillna(0.0)
     df["n_items"] = df["n_items"].fillna(0).astype("int64")
+    df["has_comment"] = df["has_comment"].astype("boolean")
     df["revenue"] = df["items_value"] + df["freight_value"]
 
     delivered = df["order_delivered_customer_date"]

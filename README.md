@@ -10,6 +10,7 @@ environ 100 000 commandes passées entre 2016 et 2018.
 |---|---|
 | Vue d'ensemble | CA, commandes, panier moyen, note moyenne, taux de retard, délai de livraison, comparés à la période précédente ; CA mensuel ; top 10 des catégories et des États |
 | Logistique | Délai de livraison, taux et durée des retards, avance sur la date estimée, préparation vendeur, part du port ; note client selon le retard ; taux de retard mensuel ; délai par étape ; délai et retard par État |
+| Satisfaction | Note moyenne, clients satisfaits et insatisfaits, avis commentés ; répartition des notes ; note mensuelle ; note selon la livraison et le nombre d'articles ; catégories les moins et les mieux notées |
 
 Filtres : période d'achat et États du client, conservés d'une page à l'autre.
 
@@ -53,6 +54,7 @@ pytest
 app.py                     point d'entrée Streamlit (navigation)
 views/overview.py          page « Vue d'ensemble »
 views/logistics.py         page « Logistique »
+views/satisfaction.py      page « Satisfaction »
 olist_dashboard/
   config.py                chemins et règles métier
   data.py                  CSV bruts -> tables orders / items (Parquet)
@@ -70,7 +72,13 @@ tests/                     tests unitaires (pytest)
   (`canceled`) ou indisponibles (`unavailable`) sont exclues.
 - **Panier moyen** : chiffre d'affaires / nombre de commandes.
 - **Note moyenne** : moyenne des avis (1 à 5). Une commande notée plusieurs fois
-  compte pour la moyenne de ses notes.
+  compte pour la moyenne de ses notes ; pour la répartition par étoile, cette
+  moyenne est arrondie (4,5 → 5).
+- **Clients satisfaits / insatisfaits** : commandes notées 4-5 / 1-2 étoiles.
+- **Avis avec commentaire** : l'un des avis de la commande contient un message écrit.
+- **Note par catégorie** : une commande compte dans chaque catégorie de produits
+  qu'elle contient ; seules les catégories ayant au moins 0,3 % des avis (et au
+  moins 20) sont classées.
 - **Livraison en retard** : commande livrée après le jour de livraison estimé
   communiqué au client (comparaison au jour près).
 - **Délai de livraison** : de l'achat à la réception, commandes livrées uniquement.

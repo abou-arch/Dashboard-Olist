@@ -54,6 +54,7 @@ def raw():
             "review_id": ["r1", "r2", "r3"],
             "order_id": ["o1", "o1", "o2"],
             "review_score": [4, 5, 1],
+            "review_comment_message": [None, "Muito bom", "  "],
         }
     )
     products = pd.DataFrame(
@@ -130,3 +131,10 @@ def test_processed_tables_are_rebuilt_when_schema_changes(raw, tmp_path):
     # Ancienne version des tables : une colonne en moins.
     tables["orders"].drop(columns="delay_days").to_parquet(tmp_path / "orders.parquet")
     assert not processed_tables_exist(tmp_path)
+
+
+def test_build_orders_has_comment(raw):
+    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    assert orders.loc["o1", "has_comment"] == True  # noqa: E712 - l'un des deux avis a un message
+    assert orders.loc["o2", "has_comment"] == False  # noqa: E712 - message vide
+    assert pd.isna(orders.loc["o3", "has_comment"])  # aucun avis

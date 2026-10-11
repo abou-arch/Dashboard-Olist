@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 from olist_dashboard.config import EXCLUDED_STATUSES
@@ -231,3 +232,119 @@ def logistics_by_state(orders: pd.DataFrame) -> pd.DataFrame:
         delivered=("order_id", "count"),
     )
     return out.sort_values("delivery_days", ascending=False).reset_index()
+
+
+# --- Satisfaction ------------------------------------------------------------
+
+
+def reviewed(orders: pd.DataFrame) -> pd.DataFrame:
+    """Commandes qui ont reçu au moins un avis, avec leur note arrondie (1 à 5).
+
+    Une commande notée plusieurs fois a pour note la moyenne de ses avis ;
+    l'arrondi (4,5 -> 5) la range dans une seule étoile.
+    """
+    out = orders.dropna(subset=["review_score"])
+    stars = np.floor(out["review_score"] + 0.5).astype("int64")
+    return out.assign(stars=stars)
+
+
+@dataclass(frozen=True)
+class SatisfactionKpis:
+    reviewed: int
+    response_rate: float | None
+    average_review: float | None
+    satisfied_share: float | None
+    dissatisfied_share: float | None
+    comment_rate: float | None
+    dissatisfied_comment_rate: float | None
+
+
+def compute_satisfaction_kpis(orders: pd.DataFrame) -> SatisfactionKpis:
+    rated = reviewed(orders)
+    unhappy = rated[rated["stars"] <= 2]
+    return SatisfactionKpis(
+        reviewed=len(rated),
+        response_rate=len(rated) / len(orders) if len(orders) else None,
+        average_review=_mean(rated["review_score"]),
+        satisfied_share=_mean((rated["stars"] >= 4).astype("float")),
+        dissatisfied_share=_mean((rated["stars"] <= 2).astype("float")),
+        comment_rate=_mean(rated["has_comment"].astype("float")),
+        dissatisfied_comment_rate=_mean(unhappy["has_comment"].astype("float")),
+    )
+
+
+def score_distribution(orders: pd.DataFrame) -> pd.DataFrame:
+    """Nombre et part des commandes par note, de 5 à 1 étoile."""
+    rated = reviewed(orders)
+    counts = rated["stars"].value_counts().reindex(range(5, 0, -1), fill_value=0)
+    out = counts.rename("orders").rename_axis("stars").reset_index()
+    total = out["orders"].sum()
+    out["share"] = out["orders"] / total if total else 0.0
+    out["label"] = out["stars"].map(lambda n: f"{n} ★")
+    return out
+
+
+def monthly_satisfaction(orders: pd.DataFrame) -> pd.DataFrame:
+    rated = reviewed(orders)
+    out = rated.groupby(_month(rated["purchase_date"])).agg(
+        review_score=("review_score", "mean"),
+        dissatisfied_share=("stars", lambda s: (s <= 2).mean()),
+        reviewed=("order_id", "count"),
+    )
+    return out.reset_index()
+
+
+def _review_groups(rated: pd.DataFrame, groups: dict[str, pd.Series]) -> pd.DataFrame:
+    rows = [
+        {
+            "group": label,
+            "review_score": _mean(rated.loc[mask, "review_score"]),
+            "dissatisfied_share": _mean((rated.loc[mask, "stars"] <= 2).astype("float")),
+            "orders": int(mask.sum()),
+        }
+        for label, mask in groups.items()
+    ]
+    return pd.DataFrame(rows)
+
+
+def review_by_delivery(orders: pd.DataFrame) -> pd.DataFrame:
+    """Note moyenne selon que la commande a été livrée à temps, en retard ou pas livrée."""
+    rated = reviewed(orders)
+    is_delivered = rated["order_status"] == "delivered"
+    return _review_groups(
+        rated,
+        {
+            "Livrée à temps": is_delivered & (rated["delay_days"] <= 0),
+            "Livrée en retard": is_delivered & (rated["delay_days"] > 0),
+            "Non livrée": ~is_delivered,
+        },
+    )
+
+
+def review_by_items(orders: pd.DataFrame) -> pd.DataFrame:
+    """Note moyenne selon le nombre d'articles de la commande."""
+    rated = reviewed(orders)
+    n = rated["n_items"]
+    return _review_groups(
+        rated, {"1 article": n == 1, "2 articles": n == 2, "3 articles ou +": n >= 3}
+    )
+
+
+def review_by_category(orders: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
+    """Note moyenne par catégorie de produit, de la moins bien à la mieux notée.
+
+    Une commande compte une fois dans chaque catégorie de produits qu'elle contient.
+    """
+    rated = reviewed(orders)[["order_id", "review_score", "stars"]]
+    pairs = items[["order_id", "category"]].drop_duplicates().merge(rated, on="order_id")
+    out = pairs.groupby("category").agg(
+        review_score=("review_score", "mean"),
+        dissatisfied_share=("stars", lambda s: (s <= 2).mean()),
+        orders=("order_id", "count"),
+    )
+    return out.sort_values("review_score").reset_index()
+
+
+def min_reviews_for_ranking(n_reviews: int) -> int:
+    """Nombre d'avis minimum pour classer une catégorie (0,3 % des avis, au moins 20)."""
+    return max(20, round(n_reviews * 0.003))

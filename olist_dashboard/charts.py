@@ -94,8 +94,12 @@ def monthly_trend_chart(
     hovertemplate: str,
     customdata_cols: tuple[str, ...] = (),
     yaxis: dict | None = None,
+    zero_based: bool = True,
 ) -> go.Figure:
     """Évolution mensuelle d'une seule série, en aire légère.
+
+    ``zero_based=False`` adapte l'axe aux valeurs (sans aire) : utile pour une
+    note qui varie entre 3,8 et 4,3 et serait écrasée sur une échelle de 0 à 5.
 
     ``hovertemplate`` peut citer le mois via ``%{customdata[0]}`` et les
     colonnes ``customdata_cols`` via ``%{customdata[1]}``, ``%{customdata[2]}``…
@@ -110,14 +114,14 @@ def monthly_trend_chart(
             mode="lines+markers",
             line=dict(color=p.accent, width=2),
             marker=dict(size=8, color=p.accent, line=dict(width=2, color=p.surface)),
-            fill="tozeroy",
+            fill="tozeroy" if zero_based else None,
             fillcolor=p.accent_wash,
             hovertemplate=hovertemplate + "<extra></extra>",
         )
     )
     _base_layout(fig, p, height=320)
     _monthly_xaxis(fig, p)
-    fig.update_yaxes(rangemode="tozero", **(yaxis or {}))
+    fig.update_yaxes(rangemode="tozero" if zero_based else "normal", **(yaxis or {}))
     return fig
 
 
@@ -189,7 +193,8 @@ def horizontal_bar_chart(
             hovertemplate=hovertemplate + "<extra></extra>",
         )
     )
-    _base_layout(fig, p, height=max(240, 30 * len(df)))
+    # ~30 px par barre : des barres fines, quel que soit leur nombre.
+    _base_layout(fig, p, height=max(110, 30 * len(df) + 20))
     fig.update_xaxes(showgrid=False, showticklabels=False, linecolor="rgba(0,0,0,0)")
     fig.update_yaxes(showgrid=False, linecolor=p.baseline, tickfont=dict(color=p.text_secondary))
     # Place à droite (axe + marge) pour que les étiquettes de valeur ne soient pas coupées.
