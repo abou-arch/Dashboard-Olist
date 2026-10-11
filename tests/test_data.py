@@ -2,7 +2,15 @@ import pandas as pd
 import pytest
 
 from olist_dashboard.config import UNKNOWN_CATEGORY
-from olist_dashboard.data import build_categories, build_items, build_orders, format_category
+from olist_dashboard.data import (
+    build_categories,
+    build_items,
+    build_orders,
+    build_tables,
+    format_category,
+    processed_tables_exist,
+    write_processed,
+)
 
 
 @pytest.fixture
@@ -106,3 +114,19 @@ def test_build_items_adds_order_context(raw):
     assert first["category"] == "Health beauty"
     assert first["customer_state"] == "SP"
     assert first["purchase_date"] == pd.Timestamp("2017-03-01 10:00")
+
+
+def test_build_orders_delay_days(raw):
+    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    assert orders.loc["o1", "delay_days"] == 0
+    assert orders.loc["o2", "delay_days"] == 1
+    assert pd.isna(orders.loc["o3", "delay_days"])
+
+
+def test_processed_tables_are_rebuilt_when_schema_changes(raw, tmp_path):
+    tables = build_tables(raw)
+    write_processed(tables, tmp_path)
+    assert processed_tables_exist(tmp_path)
+    # Ancienne version des tables : une colonne en moins.
+    tables["orders"].drop(columns="delay_days").to_parquet(tmp_path / "orders.parquet")
+    assert not processed_tables_exist(tmp_path)

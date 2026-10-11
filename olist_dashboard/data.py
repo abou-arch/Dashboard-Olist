@@ -14,6 +14,7 @@ Les fonctions ``build_*`` sont pures (DataFrames en entrée et en sortie) pour
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from olist_dashboard.config import (
     MISSING_CATEGORY_TRANSLATIONS,
@@ -70,6 +71,42 @@ def build_categories(products: pd.DataFrame, translation: pd.DataFrame) -> pd.Se
     return pd.Series(labels.to_numpy(), index=products["product_id"], name="category")
 
 
+# Colonnes des tables produites (et attendues dans les fichiers Parquet).
+ORDER_COLUMNS = [
+    "order_id",
+    "customer_unique_id",
+    "customer_city",
+    "customer_state",
+    "order_status",
+    "purchase_date",
+    "order_approved_at",
+    "order_delivered_carrier_date",
+    "order_delivered_customer_date",
+    "order_estimated_delivery_date",
+    "n_items",
+    "items_value",
+    "freight_value",
+    "revenue",
+    "review_score",
+    "delivery_days",
+    "delay_days",
+    "is_late",
+]
+ITEM_COLUMNS = [
+    "order_id",
+    "order_item_id",
+    "product_id",
+    "seller_id",
+    "category",
+    "price",
+    "freight_value",
+    "purchase_date",
+    "order_status",
+    "customer_state",
+]
+TABLE_COLUMNS = {"orders": ORDER_COLUMNS, "items": ITEM_COLUMNS}
+
+
 def build_orders(
     orders: pd.DataFrame,
     items: pd.DataFrame,
@@ -100,30 +137,13 @@ def build_orders(
     delivered = df["order_delivered_customer_date"]
     df["delivery_days"] = (delivered - df["order_purchase_timestamp"]).dt.total_seconds() / 86_400
     # La date estimée est une date sans heure : on compare au jour près.
-    late = delivered.dt.normalize() > df["order_estimated_delivery_date"].dt.normalize()
-    df["is_late"] = late.astype("boolean").where(delivered.notna())
+    # delay_days > 0 : livrée en retard ; < 0 : livrée en avance.
+    delay = delivered.dt.normalize() - df["order_estimated_delivery_date"].dt.normalize()
+    df["delay_days"] = delay.dt.days.astype("float64")
+    df["is_late"] = (df["delay_days"] > 0).astype("boolean").where(delivered.notna())
 
     df = df.rename(columns={"order_purchase_timestamp": "purchase_date"})
-    columns = [
-        "order_id",
-        "customer_unique_id",
-        "customer_city",
-        "customer_state",
-        "order_status",
-        "purchase_date",
-        "order_approved_at",
-        "order_delivered_carrier_date",
-        "order_delivered_customer_date",
-        "order_estimated_delivery_date",
-        "n_items",
-        "items_value",
-        "freight_value",
-        "revenue",
-        "review_score",
-        "delivery_days",
-        "is_late",
-    ]
-    return df[columns].sort_values("purchase_date", ignore_index=True)
+    return df[ORDER_COLUMNS].sort_values("purchase_date", ignore_index=True)
 
 
 def build_items(items: pd.DataFrame, orders: pd.DataFrame, categories: pd.Series) -> pd.DataFrame:
@@ -131,19 +151,9 @@ def build_items(items: pd.DataFrame, orders: pd.DataFrame, categories: pd.Series
     context = orders.set_index("order_id")[["purchase_date", "order_status", "customer_state"]]
     df = items.join(context, on="order_id").join(categories, on="product_id")
     df["category"] = df["category"].fillna(UNKNOWN_CATEGORY)
-    columns = [
-        "order_id",
-        "order_item_id",
-        "product_id",
-        "seller_id",
-        "category",
-        "price",
-        "freight_value",
-        "purchase_date",
-        "order_status",
-        "customer_state",
-    ]
-    return df[columns].sort_values(["purchase_date", "order_id", "order_item_id"], ignore_index=True)
+    return df[ITEM_COLUMNS].sort_values(
+        ["purchase_date", "order_id", "order_item_id"], ignore_index=True
+    )
 
 
 def build_tables(raw: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -159,11 +169,13 @@ def write_processed(tables: dict[str, pd.DataFrame], out_dir: Path = PROCESSED_D
         df.to_parquet(out_dir / f"{name}.parquet", index=False)
 
 
-TABLE_NAMES = ("orders", "items")
-
-
 def processed_tables_exist(processed_dir: Path = PROCESSED_DIR) -> bool:
-    return all((processed_dir / f"{name}.parquet").exists() for name in TABLE_NAMES)
+    """Vrai si les tables Parquet existent et ont les colonnes attendues par cette version."""
+    for name, columns in TABLE_COLUMNS.items():
+        path = processed_dir / f"{name}.parquet"
+        if not path.exists() or pq.read_schema(path).names != columns:
+            return False
+    return True
 
 
 def load_tables(
@@ -172,4 +184,4 @@ def load_tables(
     """Charge les tables Parquet, en les (re)construisant depuis les CSV si besoin."""
     if not processed_tables_exist(processed_dir):
         write_processed(build_tables(load_raw(raw_dir)), processed_dir)
-    return {name: pd.read_parquet(processed_dir / f"{name}.parquet") for name in TABLE_NAMES}
+    return {name: pd.read_parquet(processed_dir / f"{name}.parquet") for name in TABLE_COLUMNS}

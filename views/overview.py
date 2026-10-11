@@ -1,105 +1,32 @@
 """Page « Vue d'ensemble » : KPI, évolution du CA, catégories et États."""
 
-import pandas as pd
 import streamlit as st
 
-from olist_dashboard import charts, metrics
+from olist_dashboard import charts, metrics, ui
 from olist_dashboard import formatting as fmt
-from olist_dashboard.config import RELIABLE_END, RELIABLE_START
-from olist_dashboard.data import load_tables, processed_tables_exist
-
-
-@st.cache_data(show_spinner=False)
-def get_tables() -> dict[str, pd.DataFrame]:
-    return load_tables()
-
-
-def relative_delta(current: float | None, previous: float | None) -> str | None:
-    if current is None or not previous:
-        return None
-    return fmt.percent(current / previous - 1, signed=True)
-
-
-def point_delta(current: float | None, previous: float | None) -> str | None:
-    if current is None or previous is None:
-        return None
-    return f"{fmt.number((current - previous) * 100, 1, signed=True)} pt"
-
-
-def absolute_delta(current: float | None, previous: float | None, unit: str = "") -> str | None:
-    if current is None or previous is None:
-        return None
-    return f"{fmt.number(current - previous, 2, signed=True)}{unit}"
-
+from olist_dashboard.ui import absolute_delta, point_delta, relative_delta
 
 st.title("Vue d'ensemble")
 st.caption("Olist, place de marché e-commerce brésilienne. Montants en réais (R$).")
 
-spinner_text = (
-    "Chargement des données…"
-    if processed_tables_exist()
-    else "Premier lancement : construction des tables à partir des CSV de data/raw/ "
-    "(cela peut prendre jusqu'à une minute)…"
-)
-try:
-    with st.spinner(spinner_text):
-        tables = get_tables()
-except FileNotFoundError as error:
-    st.error(str(error), icon=":material/folder_off:")
-    st.stop()
+tables = ui.load_data()
 orders, items = tables["orders"], tables["items"]
-
-# --- Filtres -----------------------------------------------------------------
-min_day = orders["purchase_date"].min().date()
-max_day = orders["purchase_date"].max().date()
-all_states = sorted(orders["customer_state"].dropna().unique())
-
-col_period, col_states = st.columns([1, 2])
-with col_period:
-    period = st.date_input(
-        "Période d'achat",
-        value=(RELIABLE_START.date(), RELIABLE_END.date()),
-        min_value=min_day,
-        max_value=max_day,
-        format="DD/MM/YYYY",
-        help="Par défaut, janvier 2017 à août 2018 : les mois en dehors de cette "
-        "plage ne comptent que quelques centaines de commandes.",
-    )
-with col_states:
-    states = st.multiselect(
-        "États du client", all_states, placeholder="Tous les États"
-    )
-
-if not isinstance(period, tuple) or len(period) != 2:
-    st.info("Choisissez une date de fin pour la période.")
-    st.stop()
-
-start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-current = metrics.filter_orders(orders, start, end, states)
-if current.empty:
-    st.warning("Aucune commande pour ces filtres.")
-    st.stop()
+selection = ui.filter_bar(orders)
+current = selection.orders
 current_items = items[items["order_id"].isin(current["order_id"])]
-
-# La comparaison n'a de sens que si la période précédente est couverte par
-# des données représentatives.
-prev_start, prev_end = metrics.previous_period(start, end)
-has_previous = prev_start >= RELIABLE_START
 kpis = metrics.compute_kpis(current)
 prev = (
-    metrics.compute_kpis(metrics.filter_orders(orders, prev_start, prev_end, states))
-    if has_previous
+    metrics.compute_kpis(selection.previous_orders)
+    if selection.previous_orders is not None
     else None
 )
+delta_note = selection.delta_note
 
 # --- KPI ---------------------------------------------------------------------
 monthly = metrics.monthly_sales(current)
 spark_revenue = monthly["revenue"].tolist()[-12:]
 spark_orders = monthly["orders"].tolist()[-12:]
 spark_basket = (monthly["revenue"] / monthly["orders"]).tolist()[-12:]
-delta_note = (
-    f"vs {prev_start:%d/%m/%Y} – {prev_end:%d/%m/%Y}" if has_previous else None
-)
 
 row1 = st.columns(3)
 row1[0].metric(
@@ -160,20 +87,20 @@ row2[2].metric(
     border=True,
     help="De l'achat à la réception par le client, commandes livrées uniquement.",
 )
-if not has_previous:
-    st.caption(
-        "Pas de comparaison : la période précédente sortirait de la plage de données représentative (dès janvier 2017)."
-    )
+ui.no_comparison_caption(selection)
 
 # --- Graphiques --------------------------------------------------------------
-palette = charts.palette_for(st.context.theme.type)
+palette = ui.palette()
 
 st.subheader("Chiffre d'affaires mensuel")
-st.plotly_chart(
-    charts.monthly_revenue_chart(monthly, palette),
-    width="stretch",
-    config={"displayModeBar": False},
-    theme=None,
+ui.show_chart(
+    charts.monthly_trend_chart(
+        monthly, "revenue", palette,
+        hovertemplate="<b>%{customdata[0]}</b><br>CA : R$ %{y:,.0f}"
+        "<br>Commandes : %{customdata[1]:,}",
+        customdata_cols=("orders",),
+        yaxis=dict(tickprefix="R$ ", tickformat="~s"),
+    )
 )
 
 left, right = st.columns(2, gap="large")
@@ -182,11 +109,12 @@ with left:
     st.subheader("Top 10 catégories")
     categories = metrics.revenue_by_category(current_items)
     categories["value_label"] = categories["revenue"].map(fmt.compact_currency)
-    st.plotly_chart(
-        charts.ranked_bar_chart(categories, "category", "revenue", palette),
-        width="stretch",
-        config={"displayModeBar": False},
-        theme=None,
+    ui.show_chart(
+        charts.horizontal_bar_chart(
+            categories, "category", "revenue", palette,
+            hovertemplate="<b>%{y}</b><br>CA : R$ %{x:,.0f}<br>Part du CA : %{customdata[0]:.1%}",
+            customdata_cols=("share",),
+        )
     )
     st.caption(f"Ces 10 catégories font {fmt.percent(categories['share'].sum(), 0)} du CA.")
 
@@ -194,15 +122,13 @@ with right:
     st.subheader("Top 10 États")
     by_state = metrics.revenue_by_state(current)
     by_state["value_label"] = by_state["revenue"].map(fmt.compact_currency)
-    st.plotly_chart(
-        charts.ranked_bar_chart(
+    ui.show_chart(
+        charts.horizontal_bar_chart(
             by_state, "customer_state", "revenue", palette,
-            extra_cols=("orders",),
-            hover_extra="<br>Commandes : %{customdata[1]:,}",
-        ),
-        width="stretch",
-        config={"displayModeBar": False},
-        theme=None,
+            hovertemplate="<b>%{y}</b><br>CA : R$ %{x:,.0f}<br>Part du CA : %{customdata[0]:.1%}"
+            "<br>Commandes : %{customdata[1]:,}",
+            customdata_cols=("share", "orders"),
+        )
     )
     st.caption(f"Ces 10 États font {fmt.percent(by_state['share'].sum(), 0)} du CA.")
 
