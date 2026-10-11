@@ -1,8 +1,14 @@
 # Dashboard Olist
 
-Tableau de bord interactif (Streamlit + Plotly) sur le
+Tableau de bord interactif sur le
 [jeu de données e-commerce brésilien d'Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) :
 environ 100 000 commandes passées entre 2016 et 2018.
+
+Deux interfaces affichent les mêmes chiffres, calculés par le même code Python
+(`olist_dashboard/`) :
+
+- **Application web** (React + API FastAPI), à déployer en ligne ;
+- **Application Streamlit**, pratique pour explorer en local.
 
 ## Pages
 
@@ -20,25 +26,69 @@ Filtres : période d'achat et États du client, conservés d'une page à l'autre
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows : .venv\Scripts\activate
 pip install -r requirements.txt
+cd web && npm install && cd ..     # application web uniquement (Node.js 20 ou +)
 ```
 
 ### Données
 
-Les CSV ne sont pas versionnés. Téléchargez l'archive depuis
-[Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) et placez les
-fichiers `.csv` dans `data/raw/`, puis construisez les tables du dashboard :
+Les tables préparées (`data/processed/*.parquet`, 13 Mo) sont versionnées :
+les applications fonctionnent dès le clone. Les CSV bruts (120 Mo) ne le sont pas ;
+pour reconstruire les tables, téléchargez l'archive depuis
+[Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce), placez les
+fichiers `.csv` dans `data/raw/`, puis :
 
 ```bash
 python scripts/build_dataset.py
 ```
 
-Le script écrit `data/processed/orders.parquet` et `data/processed/items.parquet`.
-Si ces fichiers sont absents, ou si leurs colonnes ne correspondent plus au code
-(après une mise à jour), l'application les reconstruit au lancement.
+Si les colonnes des tables ne correspondent plus au code (après une mise à jour),
+les applications les reconstruisent au lancement à partir de `data/raw/`.
 
-## Lancement
+## Application web
+
+### En développement
+
+Deux terminaux :
+
+```bash
+uvicorn api.main:app --reload       # API sur http://localhost:8000
+cd web && npm run dev                # site sur http://localhost:5173
+```
+
+Le site relaie les appels `/api` vers l'API. Documentation interactive de l'API :
+http://localhost:8000/api/docs.
+
+### En production
+
+```bash
+cd web && npm run build && cd ..     # compile le site dans web/dist/
+uvicorn api.main:app --port 8000     # API + site sur http://localhost:8000
+```
+
+Les filtres figurent dans l'adresse (`/logistique?du=2018-01-01&au=2018-06-30&etats=SP,RJ`) :
+une vue se partage par un simple lien.
+
+### Mise en ligne
+
+Le `Dockerfile` construit une image unique (site compilé + API) :
+
+```bash
+docker build -t dashboard-olist .
+docker run -p 8000:8000 dashboard-olist
+```
+
+Sur [Render](https://render.com) (offre gratuite) : *New* > *Blueprint*, choisissez
+ce dépôt ; `render.yaml` décrit le service. L'application se redéploie à chaque
+push sur la branche principale. L'offre gratuite met le service en veille après
+15 minutes sans visite : la première page suivante met environ une minute à
+s'afficher. L'API utilise environ 350 Mo de mémoire (limite gratuite : 512 Mo).
+
+Toute plateforme qui exécute une image Docker convient (Railway, Fly.io, Google
+Cloud Run…) : l'application écoute sur le port indiqué par la variable `PORT`.
+
+## Application Streamlit
 
 ```bash
 streamlit run app.py
@@ -47,27 +97,37 @@ streamlit run app.py
 ## Tests
 
 ```bash
-pytest
+pytest                               # calculs, données et API
+cd web && npm test                   # mise en forme et écarts (front)
 ```
 
 ## Structure
 
 ```
+api/
+  main.py                  application FastAPI : routes /api et service du site
+  pages.py                 données de chaque page (JSON)
+web/
+  src/pages/               pages React
+  src/components/          tuiles, graphiques, filtres, tableaux
+  src/lib/                 appels à l'API, graphiques ECharts, mise en forme, thème
+olist_dashboard/
+  config.py                chemins et règles métier
+  data.py                  CSV bruts -> tables orders / items (Parquet)
+  selection.py             période, États et période de comparaison
+  metrics.py               filtres et indicateurs
+  charts.py                figures Plotly (Streamlit)
+  ui.py                    éléments communs aux pages Streamlit
+  formatting.py            nombres à la française
 app.py                     point d'entrée Streamlit (navigation)
 views/overview.py          page « Vue d'ensemble »
 views/logistics.py         page « Logistique »
 views/satisfaction.py      page « Satisfaction »
 views/sellers.py           page « Vendeurs et catégories »
 views/customers.py         page « Clients »
-olist_dashboard/
-  config.py                chemins et règles métier
-  data.py                  CSV bruts -> tables orders / items (Parquet)
-  metrics.py               filtres et indicateurs
-  charts.py                figures Plotly (clair / sombre)
-  ui.py                    éléments communs aux pages (données, filtres, écarts)
-  formatting.py            nombres à la française
 scripts/build_dataset.py   construction des tables Parquet
 tests/                     tests unitaires (pytest)
+Dockerfile, render.yaml    image de production et déploiement sur Render
 ```
 
 ## Définitions
@@ -108,3 +168,9 @@ tests/                     tests unitaires (pytest)
   données ne contient que quelques centaines de commandes ; c'est la période par
   défaut, et aucune comparaison n'est affichée si la période précédente en sort.
 - Les catégories de produits utilisent les libellés anglais fournis par Olist.
+
+## Licence des données
+
+Olist, « Brazilian E-Commerce Public Dataset », publié sur Kaggle sous licence
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) :
+usage non commercial, avec attribution.

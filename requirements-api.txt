@@ -1,0 +1,5 @@
+# Dépendances de l'API web (image Docker de production).
+pandas==3.0.6
+pyarrow==25.0.1
+fastapi==0.143.0
+uvicorn==0.54.0

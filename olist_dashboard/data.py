@@ -232,7 +232,7 @@ def build_tables(raw: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 def write_processed(tables: dict[str, pd.DataFrame], out_dir: Path = PROCESSED_DIR) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, df in tables.items():
-        df.to_parquet(out_dir / f"{name}.parquet", index=False)
+        df.to_parquet(out_dir / f"{name}.parquet", index=False, compression="zstd")
 
 
 def processed_tables_exist(processed_dir: Path = PROCESSED_DIR) -> bool:
