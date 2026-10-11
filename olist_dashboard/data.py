@@ -55,6 +55,12 @@ def load_raw(raw_dir: Path = RAW_DIR) -> dict[str, pd.DataFrame]:
         "sellers": read("sellers", dtype={"seller_zip_code_prefix": "string"}),
         "reviews": read("reviews", parse_dates=["review_creation_date", "review_answer_timestamp"]),
         "translation": read("translation"),
+        "payments": read("payments"),
+        "geolocation": read(
+            "geolocation",
+            usecols=["geolocation_zip_code_prefix", "geolocation_lat", "geolocation_lng"],
+            dtype={"geolocation_zip_code_prefix": "string"},
+        ),
     }
 
 
@@ -78,6 +84,8 @@ ORDER_COLUMNS = [
     "customer_unique_id",
     "customer_city",
     "customer_state",
+    "customer_lat",
+    "customer_lng",
     "order_status",
     "purchase_date",
     "order_approved_at",
@@ -88,6 +96,8 @@ ORDER_COLUMNS = [
     "items_value",
     "freight_value",
     "revenue",
+    "payment_type",
+    "payment_installments",
     "review_score",
     "has_comment",
     "delivery_days",
@@ -110,11 +120,42 @@ ITEM_COLUMNS = [
 TABLE_COLUMNS = {"orders": ORDER_COLUMNS, "items": ITEM_COLUMNS}
 
 
+def build_payments(payments: pd.DataFrame) -> pd.DataFrame:
+    """Moyen de paiement principal et nombre de mensualités de chaque commande.
+
+    Une commande payée en plusieurs fois (≈ 3 %, souvent carte + bon d'achat)
+    prend le moyen de paiement du plus gros montant.
+    """
+    main = payments.sort_values("payment_value", ascending=False).drop_duplicates("order_id")
+    out = main.set_index("order_id")[["payment_type"]]
+    out["payment_installments"] = payments.groupby("order_id")["payment_installments"].max()
+    return out
+
+
+# Rectangle englobant le Brésil : quelques coordonnées du fichier sont aberrantes.
+BRAZIL_LAT = (-34.0, 6.0)
+BRAZIL_LNG = (-74.0, -34.0)
+
+
+def build_zip_coordinates(geolocation: pd.DataFrame) -> pd.DataFrame:
+    """Latitude et longitude moyennes de chaque préfixe de code postal (5 chiffres)."""
+    geo = geolocation[
+        geolocation["geolocation_lat"].between(*BRAZIL_LAT)
+        & geolocation["geolocation_lng"].between(*BRAZIL_LNG)
+    ]
+    prefix = geo["geolocation_zip_code_prefix"].str.zfill(5)
+    out = geo.groupby(prefix)[["geolocation_lat", "geolocation_lng"]].mean()
+    out.columns = ["customer_lat", "customer_lng"]
+    return out
+
+
 def build_orders(
     orders: pd.DataFrame,
     items: pd.DataFrame,
     customers: pd.DataFrame,
     reviews: pd.DataFrame,
+    payments: pd.DataFrame,
+    geolocation: pd.DataFrame,
 ) -> pd.DataFrame:
     """Table au grain commande."""
     amounts = items.groupby("order_id").agg(
@@ -130,14 +171,19 @@ def build_orders(
     scores = reviews.groupby("order_id").agg(
         review_score=("review_score", "mean"), has_comment=("has_comment", "any")
     )
-    clients = customers.set_index("customer_id")[
-        ["customer_unique_id", "customer_city", "customer_state"]
+    # Les codes postaux à 4 chiffres ont perdu leur zéro initial dans le CSV.
+    clients = customers.assign(
+        zip_prefix=customers["customer_zip_code_prefix"].astype("string").str.zfill(5)
+    ).join(build_zip_coordinates(geolocation), on="zip_prefix")
+    clients = clients.set_index("customer_id")[
+        ["customer_unique_id", "customer_city", "customer_state", "customer_lat", "customer_lng"]
     ]
 
     df = (
         orders.join(clients, on="customer_id")
         .join(amounts, on="order_id")
         .join(scores, on="order_id")
+        .join(build_payments(payments), on="order_id")
     )
     df[["items_value", "freight_value"]] = df[["items_value", "freight_value"]].fillna(0.0)
     df["n_items"] = df["n_items"].fillna(0).astype("int64")
@@ -174,7 +220,10 @@ def build_items(
 
 
 def build_tables(raw: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"])
+    orders = build_orders(
+        raw["orders"], raw["items"], raw["customers"], raw["reviews"],
+        raw["payments"], raw["geolocation"],
+    )
     categories = build_categories(raw["products"], raw["translation"])
     items = build_items(raw["items"], orders, categories, raw["sellers"])
     return {"orders": orders, "items": items}

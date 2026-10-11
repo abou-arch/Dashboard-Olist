@@ -460,3 +460,114 @@ def category_stats(orders: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
     )
     out = out.join(outcomes)
     return out.sort_values("revenue", ascending=False).reset_index()
+
+
+# --- Clients -----------------------------------------------------------------
+
+PAYMENT_LABELS = {
+    "credit_card": "Carte de crédit",
+    "boleto": "Boleto",
+    "voucher": "Bon d'achat",
+    "debit_card": "Carte de débit",
+    "not_defined": "Non défini",
+}
+
+
+@dataclass(frozen=True)
+class CustomerKpis:
+    customers: int
+    repeat_rate: float | None
+    orders_per_customer: float | None
+    revenue_per_customer: float | None
+    credit_card_share: float | None
+    average_installments: float | None
+
+
+def compute_customer_kpis(orders: pd.DataFrame) -> CustomerKpis:
+    """Indicateurs clients sur les commandes vendues de la période.
+
+    Un client (``customer_unique_id``) qui revient a plusieurs ``customer_id``
+    chez Olist ; c'est bien l'identifiant unique qui est compté.
+    """
+    sales = sold(orders)
+    per_customer = sales.groupby("customer_unique_id")["order_id"].count()
+    card = sales[sales["payment_type"] == "credit_card"]
+    customers = len(per_customer)
+    return CustomerKpis(
+        customers=customers,
+        repeat_rate=_mean((per_customer > 1).astype("float")),
+        orders_per_customer=_mean(per_customer.astype("float")),
+        revenue_per_customer=float(sales["revenue"].sum() / customers) if customers else None,
+        credit_card_share=_mean((sales["payment_type"] == "credit_card").astype("float")),
+        average_installments=_mean(card["payment_installments"].astype("float")),
+    )
+
+
+def customers_by_order_count(orders: pd.DataFrame) -> pd.DataFrame:
+    """Nombre de clients selon leur nombre de commandes sur la période (1, 2, 3 ou +)."""
+    per_customer = sold(orders).groupby("customer_unique_id")["order_id"].count()
+    groups = {
+        "1 commande": per_customer == 1,
+        "2 commandes": per_customer == 2,
+        "3 commandes ou +": per_customer >= 3,
+    }
+    out = pd.DataFrame({"group": list(groups), "customers": [int(m.sum()) for m in groups.values()]})
+    total = out["customers"].sum()
+    out["share"] = out["customers"] / total if total else 0.0
+    return out
+
+
+def payment_mix(orders: pd.DataFrame) -> pd.DataFrame:
+    """Commandes, part et panier moyen par moyen de paiement principal."""
+    sales = sold(orders).dropna(subset=["payment_type"])
+    out = sales.groupby("payment_type").agg(orders=("order_id", "count"), basket=("revenue", "mean"))
+    out["share"] = out["orders"] / out["orders"].sum()
+    out = out.sort_values("orders", ascending=False).reset_index()
+    out["label"] = out["payment_type"].map(PAYMENT_LABELS).fillna(out["payment_type"])
+    return out
+
+
+INSTALLMENT_BUCKETS = [(0, 1, "1 fois"), (2, 3, "2 à 3 fois"), (4, 6, "4 à 6 fois"),
+                       (7, 9, "7 à 9 fois"), (10, float("inf"), "10 fois ou +")]
+
+
+def installments_distribution(orders: pd.DataFrame) -> pd.DataFrame:
+    """Commandes payées par carte de crédit selon le nombre de mensualités."""
+    card = sold(orders)
+    card = card[card["payment_type"] == "credit_card"]
+    rows = []
+    for low, high, label in INSTALLMENT_BUCKETS:
+        bucket = card[card["payment_installments"].between(low, high)]
+        rows.append({"group": label, "orders": len(bucket), "basket": _mean(bucket["revenue"])})
+    out = pd.DataFrame(rows)
+    total = out["orders"].sum()
+    out["share"] = out["orders"] / total if total else 0.0
+    return out
+
+
+WEEKDAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+
+def purchase_heatmap(orders: pd.DataFrame) -> pd.DataFrame:
+    """Nombre de commandes par jour de la semaine (lignes) et heure d'achat (colonnes)."""
+    dates = sold(orders)["purchase_date"]
+    counts = pd.crosstab(dates.dt.dayofweek, dates.dt.hour)
+    counts = counts.reindex(index=range(7), columns=range(24), fill_value=0)
+    counts.index = WEEKDAYS
+    return counts
+
+
+def revenue_by_city(orders: pd.DataFrame) -> pd.DataFrame:
+    """CA, clients et position moyenne par ville, du plus gros CA au plus petit."""
+    sales = sold(orders)
+    out = sales.groupby(["customer_city", "customer_state"]).agg(
+        revenue=("revenue", "sum"),
+        customers=("customer_unique_id", "nunique"),
+        lat=("customer_lat", "mean"),
+        lng=("customer_lng", "mean"),
+    )
+    out["share"] = out["revenue"] / out["revenue"].sum()
+    out = out.sort_values("revenue", ascending=False).reset_index()
+    # « sao paulo » -> « Sao Paulo »
+    out["city"] = out["customer_city"].str.title() + " (" + out["customer_state"] + ")"
+    return out

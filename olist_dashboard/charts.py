@@ -22,6 +22,8 @@ class Palette:
     baseline: str
     # Couleurs catégorielles, dans un ordre fixe (validé daltonisme, 3 premières).
     categorical: tuple[str, ...]
+    # Rampe séquentielle (une teinte), de « peu » (proche du fond) à « beaucoup ».
+    sequential: tuple[str, ...]
 
 
 LIGHT = Palette(
@@ -34,6 +36,7 @@ LIGHT = Palette(
     grid="#e1e0d9",
     baseline="#c3c2b7",
     categorical=("#2a78d6", "#eb6834", "#1baf7a"),
+    sequential=("#cde2fb", "#86b6ef", "#3987e5", "#256abf", "#184f95", "#0d366b"),
 )
 DARK = Palette(
     accent="#3987e5",
@@ -45,6 +48,7 @@ DARK = Palette(
     grid="#2c2c2a",
     baseline="#383835",
     categorical=("#3987e5", "#d95926", "#199e70"),
+    sequential=("#104281", "#1c5cab", "#2a78d6", "#5598e7", "#86b6ef", "#cde2fb"),
 )
 
 
@@ -298,4 +302,70 @@ def scatter_chart(
     fig.update_xaxes(title_font=dict(color=p.muted, size=12))
     fig.update_yaxes(title_font=dict(color=p.muted, size=12))
     fig.update_layout(hovermode="closest", margin=dict(t=24))
+    return fig
+
+
+def heatmap_chart(counts: pd.DataFrame, p: Palette, value_name: str) -> go.Figure:
+    """Carte de chaleur (lignes x colonnes) sur la rampe séquentielle, première ligne en haut."""
+    ramp = p.sequential
+    fig = go.Figure(
+        go.Heatmap(
+            z=counts.to_numpy(),
+            x=[f"{h}h" for h in counts.columns],
+            y=list(counts.index),
+            colorscale=[[i / (len(ramp) - 1), color] for i, color in enumerate(ramp)],
+            xgap=2,
+            ygap=2,
+            colorbar=dict(
+                thickness=8, outlinewidth=0, tickfont=dict(color=p.muted),
+                title=dict(text=value_name, font=dict(color=p.muted, size=12)),
+            ),
+            hovertemplate="%{y}, %{x} : %{z:,} " + value_name + "<extra></extra>",
+        )
+    )
+    _base_layout(fig, p, height=300)
+    fig.update_xaxes(showgrid=False, linecolor="rgba(0,0,0,0)", dtick=3, tickangle=0, ticks="")
+    fig.update_yaxes(showgrid=False, linecolor="rgba(0,0,0,0)", autorange="reversed",
+                     tickfont=dict(color=p.text_secondary))
+    return fig
+
+
+def city_map_chart(
+    cities: pd.DataFrame, size_col: str, p: Palette, highlighted: int, hovertemplate: str,
+    customdata_cols: tuple[str, ...] = (), max_size: int = 40,
+) -> go.Figure:
+    """Carte des villes sans fond de carte (aucun téléchargement nécessaire).
+
+    Toutes les villes sont des points gris qui dessinent la forme du pays ; les
+    ``highlighted`` premières lignes sont des bulles dont la surface est
+    proportionnelle à ``size_col``. Axes à la même échelle (degrés).
+    """
+    cities = cities.dropna(subset=["lat", "lng"])
+    top = cities.head(highlighted)
+
+    def customdata(df: pd.DataFrame):
+        return df[list(customdata_cols)].to_numpy() if customdata_cols else None
+
+    largest = top[size_col].max() if len(top) else 1
+    fig = go.Figure()
+    fig.add_scattergl(
+        x=cities["lng"], y=cities["lat"], mode="markers",
+        marker=dict(size=3, color=p.baseline),
+        customdata=customdata(cities),
+        hovertemplate=hovertemplate + "<extra></extra>",
+    )
+    fig.add_scatter(
+        x=top["lng"], y=top["lat"], mode="markers",
+        marker=dict(
+            size=top[size_col], sizemode="area", sizeref=2.0 * largest / max_size**2, sizemin=3,
+            color=p.accent, opacity=0.6, line=dict(width=1, color=p.surface),
+        ),
+        customdata=customdata(top),
+        hovertemplate=hovertemplate + "<extra></extra>",
+    )
+    _base_layout(fig, p, height=560)
+    hidden = dict(visible=False, showgrid=False, zeroline=False)
+    fig.update_xaxes(**hidden)
+    fig.update_yaxes(**hidden, scaleanchor="x", scaleratio=1)
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), hovermode="closest")
     return fig

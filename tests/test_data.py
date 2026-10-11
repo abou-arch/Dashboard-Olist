@@ -44,7 +44,7 @@ def raw():
         {
             "customer_id": ["c1", "c2", "c3"],
             "customer_unique_id": ["u1", "u2", "u1"],
-            "customer_zip_code_prefix": ["01000", "20000", "01000"],
+            "customer_zip_code_prefix": ["1000", "20000", "01000"],
             "customer_city": ["sao paulo", "rio de janeiro", "sao paulo"],
             "customer_state": ["SP", "RJ", "SP"],
         }
@@ -64,6 +64,23 @@ def raw():
         }
     )
     sellers = pd.DataFrame({"seller_id": ["s1", "s2"], "seller_state": ["SP", "PR"]})
+    # o2 : payée par carte (gros montant) et bon d'achat.
+    payments = pd.DataFrame(
+        {
+            "order_id": ["o1", "o2", "o2"],
+            "payment_type": ["boleto", "voucher", "credit_card"],
+            "payment_installments": [1, 1, 6],
+            "payment_value": [33.0, 10.0, 45.0],
+        }
+    )
+    # La deuxième coordonnée de 01000 est hors du Brésil : ignorée.
+    geolocation = pd.DataFrame(
+        {
+            "geolocation_zip_code_prefix": ["01000", "01000", "20000"],
+            "geolocation_lat": [-23.5, 40.0, -22.9],
+            "geolocation_lng": [-46.6, -3.7, -43.2],
+        }
+    )
     translation = pd.DataFrame(
         {
             "product_category_name": ["beleza_saude"],
@@ -73,6 +90,14 @@ def raw():
     return dict(
         orders=orders, items=items, customers=customers,
         reviews=reviews, products=products, sellers=sellers, translation=translation,
+        payments=payments, geolocation=geolocation,
+    )
+
+
+def orders_table(raw):
+    return build_orders(
+        raw["orders"], raw["items"], raw["customers"], raw["reviews"],
+        raw["payments"], raw["geolocation"],
     )
 
 
@@ -86,7 +111,7 @@ def test_build_categories_handles_missing_translations(raw):
 
 
 def test_build_orders_amounts_and_reviews(raw):
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    orders = orders_table(raw).set_index("order_id")
     assert orders.loc["o1", "items_value"] == 30.0
     assert orders.loc["o1", "freight_value"] == 3.0
     assert orders.loc["o1", "revenue"] == 33.0
@@ -100,7 +125,7 @@ def test_build_orders_amounts_and_reviews(raw):
 
 
 def test_build_orders_delivery(raw):
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    orders = orders_table(raw).set_index("order_id")
     assert orders.loc["o1", "is_late"] == False  # noqa: E712 - même jour que l'estimation
     assert orders.loc["o2", "is_late"] == True  # noqa: E712
     assert pd.isna(orders.loc["o3", "is_late"])  # jamais livrée
@@ -108,7 +133,7 @@ def test_build_orders_delivery(raw):
 
 
 def test_build_items_adds_order_context(raw):
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"])
+    orders = orders_table(raw)
     categories = build_categories(raw["products"], raw["translation"])
     items = build_items(raw["items"], orders, categories, raw["sellers"])
     assert len(items) == 3
@@ -120,7 +145,7 @@ def test_build_items_adds_order_context(raw):
 
 
 def test_build_orders_delay_days(raw):
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    orders = orders_table(raw).set_index("order_id")
     assert orders.loc["o1", "delay_days"] == 0
     assert orders.loc["o2", "delay_days"] == 1
     assert pd.isna(orders.loc["o3", "delay_days"])
@@ -136,7 +161,23 @@ def test_processed_tables_are_rebuilt_when_schema_changes(raw, tmp_path):
 
 
 def test_build_orders_has_comment(raw):
-    orders = build_orders(raw["orders"], raw["items"], raw["customers"], raw["reviews"]).set_index("order_id")
+    orders = orders_table(raw).set_index("order_id")
     assert orders.loc["o1", "has_comment"] == True  # noqa: E712 - l'un des deux avis a un message
     assert orders.loc["o2", "has_comment"] == False  # noqa: E712 - message vide
     assert pd.isna(orders.loc["o3", "has_comment"])  # aucun avis
+
+
+def test_build_orders_payments(raw):
+    orders = orders_table(raw).set_index("order_id")
+    assert orders.loc["o1", "payment_type"] == "boleto"
+    assert orders.loc["o2", "payment_type"] == "credit_card"  # plus gros montant
+    assert orders.loc["o2", "payment_installments"] == 6
+    assert pd.isna(orders.loc["o3", "payment_type"])
+
+
+def test_build_orders_coordinates(raw):
+    orders = orders_table(raw).set_index("order_id")
+    # c1 a un code postal à 4 chiffres : complété en 01000.
+    assert orders.loc["o1", "customer_lat"] == pytest.approx(-23.5)
+    assert orders.loc["o1", "customer_lng"] == pytest.approx(-46.6)
+    assert orders.loc["o2", "customer_lat"] == pytest.approx(-22.9)

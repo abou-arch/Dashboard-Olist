@@ -12,6 +12,7 @@ environ 100 000 commandes passées entre 2016 et 2018.
 | Logistique | Délai de livraison, taux et durée des retards, avance sur la date estimée, préparation vendeur, part du port ; note client selon le retard ; taux de retard mensuel ; délai par étape ; délai et retard par État |
 | Satisfaction | Note moyenne, clients satisfaits et insatisfaits, avis commentés ; répartition des notes ; note mensuelle ; note selon la livraison et le nombre d'articles ; catégories les moins et les mieux notées |
 | Vendeurs et catégories | Vendeurs actifs, CA médian, concentration des ventes, petits vendeurs, prix moyen ; courbe de concentration ; CA par État du vendeur ; CA et note par catégorie ; plus gros vendeurs et vendeurs à surveiller |
+| Clients | Clients, clients revenus, CA par client, paiement par carte, mensualités ; clients selon le nombre de commandes ; moyens de paiement ; panier selon les mensualités ; jours et heures d'achat ; carte et top 15 des villes |
 
 Filtres : période d'achat et États du client, conservés d'une page à l'autre.
 
@@ -57,6 +58,7 @@ views/overview.py          page « Vue d'ensemble »
 views/logistics.py         page « Logistique »
 views/satisfaction.py      page « Satisfaction »
 views/sellers.py           page « Vendeurs et catégories »
+views/customers.py         page « Clients »
 olist_dashboard/
   config.py                chemins et règles métier
   data.py                  CSV bruts -> tables orders / items (Parquet)
@@ -96,6 +98,12 @@ tests/                     tests unitaires (pytest)
   commande de plusieurs vendeurs (environ 1 %) compte pour chacun.
 - **Vendeurs à surveiller** : les moins bien notés parmi ceux qui ont au moins
   30 commandes sur la période.
+- **Client** : identifiant unique (`customer_unique_id`) ; un client revenu
+  a passé au moins deux commandes sur la période choisie.
+- **Moyen de paiement** : celui du plus gros montant de la commande (environ 3 %
+  des commandes combinent plusieurs moyens, souvent carte + bon d'achat).
+- **Carte** : position moyenne des codes postaux des clients (fichier de
+  géolocalisation Olist), sans fond de carte, donc sans connexion internet requise.
 - **Période représentative** : de janvier 2017 à août 2018. Avant et après, le jeu de
   données ne contient que quelques centaines de commandes ; c'est la période par
   défaut, et aucune comparaison n'est affichée si la période précédente en sort.

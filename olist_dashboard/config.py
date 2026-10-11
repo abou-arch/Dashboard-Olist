@@ -15,6 +15,8 @@ RAW_FILES = {
     "products": "olist_products_dataset.csv",
     "sellers": "olist_sellers_dataset.csv",
     "reviews": "olist_order_reviews_dataset.csv",
+    "payments": "olist_order_payments_dataset.csv",
+    "geolocation": "olist_geolocation_dataset.csv",
     "translation": "product_category_name_translation.csv",
 }
 
