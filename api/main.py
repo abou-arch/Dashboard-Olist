@@ -3,6 +3,7 @@
 Lancement en local : ``uvicorn api.main:app --reload`` (API sur le port 8000).
 """
 
+import threading
 from collections.abc import Callable
 from datetime import date
 from functools import lru_cache
@@ -42,8 +43,16 @@ def create_app(
     def tables() -> dict[str, pd.DataFrame]:
         return load()
 
+    # Un calcul à la fois : pandas ne gagne rien à en mener plusieurs en parallèle,
+    # et la mémoire reste sous les 512 Mo des hébergements gratuits.
+    compute_lock = threading.Lock()
+
     @lru_cache(maxsize=512)
     def page_data(page: str, start: date, end: date, states: tuple[str, ...]) -> dict[str, Any]:
+        with compute_lock:
+            return compute(page, start, end, states)
+
+    def compute(page: str, start: date, end: date, states: tuple[str, ...]) -> dict[str, Any]:
         selection = select(tables()["orders"], start, end, list(states))
         header = {
             "period": {
