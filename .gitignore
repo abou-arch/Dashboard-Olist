@@ -1,0 +1,12 @@
+# Données brutes (non versionnées : voir README). Les tables préparées de
+# data/processed/ sont versionnées : l'application déployée en a besoin.
+data/raw/
+
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Streamlit
+.streamlit/secrets.toml

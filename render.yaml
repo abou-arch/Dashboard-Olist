@@ -1,0 +1,8 @@
+# Déploiement sur Render (https://render.com) : « New » > « Blueprint », puis ce dépôt.
+services:
+  - type: web
+    name: dashboard-olist
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/meta
+    autoDeploy: true
