@@ -107,3 +107,19 @@ def test_signed_number():
     assert fmt.number(1.234, 1, signed=True) == "+1,2"
     assert fmt.number(-1.234, 1, signed=True) == "-1,2"
     assert fmt.number(0.001, 1, signed=True) == "0,0"
+
+
+def test_order_status_breakdown(orders):
+    out = metrics.order_status_breakdown(orders).set_index("status")
+    assert out.index.tolist() == metrics.STATUS_ORDER
+    assert out["orders"].tolist() == [2, 1, 0, 1]
+    assert out["share"].sum() == pytest.approx(1.0)
+
+
+def test_revenue_by_state_all(orders):
+    out = metrics.revenue_by_state(orders, top=None)
+    assert out["customer_state"].tolist() == ["SP", "RJ"]  # MG : commande annulée seulement
+
+
+def test_monthly_sales_counts_customers(orders):
+    assert metrics.monthly_sales(orders)["customers"].tolist() == [1, 1]

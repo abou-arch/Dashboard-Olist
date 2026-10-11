@@ -1,25 +1,22 @@
+import { ChartPie, Package, Store, Tag, Users, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Chart } from "../components/Chart";
 import { DataDetails, DataTable, type Column } from "../components/DataTable";
-import { Kpi, KpiGrid } from "../components/Kpi";
-import { Notice, NoComparison, Page, Section, deltaNote, type Loaded } from "../components/Page";
-import type { Seller, SellersData } from "../lib/api";
+import { Kpi } from "../components/Kpi";
+import { Card, Grid, Notice, Page, comparisonLabel, type Loaded } from "../components/Page";
+import type { ProductsData, Seller } from "../lib/api";
 import { barChart, barHeight, concentrationChart, scatterChart } from "../lib/charts";
 import { useFilters, usePageData } from "../lib/data";
 import { pointDelta, relativeDelta } from "../lib/delta";
 import * as fmt from "../lib/format";
 import { useTokens } from "../lib/theme";
 
-export function Sellers() {
+export function Products() {
   const { filters } = useFilters();
-  const state = usePageData<SellersData>("sellers", filters);
+  const state = usePageData<ProductsData>("products", filters);
   return (
-    <Page
-      title="Vendeurs et catégories"
-      intro="Qui vend quoi sur la place de marché. Montants en réais (R$), hors commandes annulées."
-      state={state}
-    >
+    <Page title="Produits" intro="Catégories et vendeurs de la place de marché" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );
@@ -37,12 +34,25 @@ const SELLER_COLUMNS: Column<Seller>[] = [
   { key: "late_rate", label: "En retard", align: "right", format: optional((v) => fmt.percent(v)) },
 ];
 
-function Content({ data }: { data: Loaded<SellersData> }) {
+function Content({ data }: { data: Loaded<ProductsData> }) {
   const t = useTokens();
   const [tab, setTab] = useState<"top" | "watch">("top");
   const { kpis, previous_kpis: prev } = data;
-  const note = deltaNote(data);
+  const note = comparisonLabel(data) ?? "Pas de comparaison";
 
+  const topCategories = useMemo(
+    () =>
+      barChart(
+        data.categories.slice(0, 10).map((c) => ({
+          label: c.category,
+          value: c.revenue,
+          text: fmt.compactCurrency(c.revenue),
+          tooltip: [`CA : ${fmt.currency(c.revenue)}`, `Part du CA : ${fmt.percent(c.share)}`, `Vendeurs : ${fmt.number(c.sellers)}`],
+        })),
+        t,
+      ),
+    [data.categories, t],
+  );
   const concentration = useMemo(
     () =>
       concentrationChart(
@@ -53,23 +63,6 @@ function Content({ data }: { data: Loaded<SellersData> }) {
         t,
       ),
     [data.concentration, kpis.top10_share, t],
-  );
-  const byState = useMemo(
-    () =>
-      barChart(
-        data.by_seller_state.map((s) => ({
-          label: s.seller_state,
-          value: s.revenue,
-          text: fmt.compactCurrency(s.revenue),
-          tooltip: [
-            `CA : ${fmt.currency(s.revenue)}`,
-            `Part du CA : ${fmt.percent(s.share)}`,
-            `Vendeurs : ${fmt.number(s.sellers)}`,
-          ],
-        })),
-        t,
-      ),
-    [data.by_seller_state, t],
   );
   const plotted = useMemo(
     () => data.categories.filter((c) => c.reviews >= data.category_threshold && c.review_score != null),
@@ -104,79 +97,47 @@ function Content({ data }: { data: Loaded<SellersData> }) {
       ),
     [plotted, data.average_review, t],
   );
-  const stateShare = fmt.percent(data.by_seller_state.reduce((sum, s) => sum + s.share, 0), 0);
 
   return (
     <>
-      <KpiGrid>
-        <Kpi
-          label="Vendeurs actifs"
-          value={fmt.number(kpis.active_sellers)}
-          delta={relativeDelta(kpis.active_sellers, prev?.active_sellers)}
-          deltaNote={note}
-          help="Vendeurs ayant réalisé au moins une vente sur la période."
-        />
-        <Kpi
-          label="CA médian par vendeur"
-          value={fmt.orDash(kpis.median_revenue, (v) => fmt.currency(v))}
-          delta={relativeDelta(kpis.median_revenue, prev?.median_revenue)}
-          deltaNote={note}
-          help="La moitié des vendeurs réalise moins que ce chiffre d'affaires sur la période."
-        />
-        <Kpi
-          label="Part du CA des 10 % premiers vendeurs"
-          value={fmt.orDash(kpis.top10_share, (v) => fmt.percent(v, 0))}
-          delta={pointDelta(kpis.top10_share, prev?.top10_share, "off")}
-          deltaNote={note}
-          help="Plus ce chiffre est élevé, plus les ventes reposent sur peu de vendeurs."
-        />
-        <Kpi
-          label={`Vendeurs à moins de ${data.small_seller_orders} commandes`}
+      <Grid cols="3">
+        <Kpi label="Catégories vendues" icon={Package} value={fmt.number(kpis.categories)}
+          delta={relativeDelta(kpis.categories, prev?.categories, "off")} note={note} />
+        <Kpi label="Prix moyen d'un article" icon={Tag} value={fmt.orDash(kpis.average_item_price, (v) => fmt.currency(v, 2))}
+          delta={relativeDelta(kpis.average_item_price, prev?.average_item_price, "off")} note={note}
+          help="Prix de vente moyen d'un article, hors frais de port." />
+        <Kpi label="Vendeurs actifs" icon={Store} value={fmt.number(kpis.active_sellers)}
+          delta={relativeDelta(kpis.active_sellers, prev?.active_sellers)} note={note}
+          help="Vendeurs ayant réalisé au moins une vente sur la période." />
+        <Kpi label="CA médian par vendeur" icon={Wallet} value={fmt.orDash(kpis.median_revenue, (v) => fmt.currency(v))}
+          delta={relativeDelta(kpis.median_revenue, prev?.median_revenue)} note={note}
+          help="La moitié des vendeurs réalise moins que ce chiffre d'affaires sur la période." />
+        <Kpi label="CA des 10 % premiers vendeurs" icon={ChartPie} value={fmt.orDash(kpis.top10_share, (v) => fmt.percent(v, 0))}
+          delta={pointDelta(kpis.top10_share, prev?.top10_share, "off")} note={note}
+          help="Plus ce chiffre est élevé, plus les ventes reposent sur peu de vendeurs." />
+        <Kpi label={`Vendeurs à moins de ${data.small_seller_orders} commandes`} icon={Users}
           value={fmt.orDash(kpis.small_seller_share, (v) => fmt.percent(v, 0))}
-          delta={pointDelta(kpis.small_seller_share, prev?.small_seller_share, "off")}
-          deltaNote={note}
-          help="Part des vendeurs actifs qui ont reçu peu de commandes sur la période."
-        />
-        <Kpi
-          label="Catégories vendues"
-          value={fmt.number(kpis.categories)}
-          delta={relativeDelta(kpis.categories, prev?.categories, "off")}
-          deltaNote={note}
-        />
-        <Kpi
-          label="Prix moyen d'un article"
-          value={fmt.orDash(kpis.average_item_price, (v) => fmt.currency(v, 2))}
-          delta={relativeDelta(kpis.average_item_price, prev?.average_item_price, "off")}
-          deltaNote={note}
-          help="Prix de vente moyen d'un article, hors frais de port."
-        />
-      </KpiGrid>
-      <NoComparison data={data} />
+          delta={pointDelta(kpis.small_seller_share, prev?.small_seller_share, "off")} note={note} />
+      </Grid>
 
-      <div className="grid-2 section">
-        <div>
-          <h2>Concentration des ventes</h2>
-          <Chart option={concentration} label="Part cumulée du chiffre d'affaires selon la part des vendeurs" />
-          <p className="caption">Vendeurs classés du plus gros CA au plus petit.</p>
-        </div>
-        <div>
-          <h2>CA par État du vendeur</h2>
-          <Chart option={byState} height={barHeight(data.by_seller_state.length)} label="Chiffre d'affaires par État du vendeur" />
-          <p className="caption">
-            Ces {data.by_seller_state.length} États font {stateShare} du CA. Les filtres d'État portent sur le client, pas sur le vendeur.
-          </p>
-        </div>
-      </div>
+      <Grid cols="2">
+        <Card title="Top 10 des catégories" subtitle="Chiffre d'affaires sur la période">
+          <Chart option={topCategories} height={barHeight(Math.min(10, data.categories.length))} label="Chiffre d'affaires des 10 premières catégories" />
+        </Card>
+        <Card title="Concentration des ventes" subtitle="Vendeurs classés du plus gros CA au plus petit">
+          <Chart option={concentration} height={300} label="Part cumulée du chiffre d'affaires selon la part des vendeurs" />
+        </Card>
+      </Grid>
 
-      <Section title="Catégories : chiffre d'affaires et satisfaction">
+      <Card className="spaced" title="Chiffre d'affaires et satisfaction par catégorie"
+        subtitle="En bas à droite : les catégories qui pèsent lourd mais déçoivent">
         {plotted.length < 2 ? (
           <Notice>Pas assez d'avis pour comparer les catégories avec ces filtres.</Notice>
         ) : (
           <>
             <Chart option={scatter} height={440} label="Chiffre d'affaires et note moyenne de chaque catégorie" />
             <p className="caption">
-              {plotted.length} catégories ayant au moins {fmt.number(data.category_threshold)} commandes notées ; les 8 plus gros CA
-              sont nommées. En bas à droite : les catégories qui pèsent lourd mais déçoivent.
+              {plotted.length} catégories ayant au moins {fmt.number(data.category_threshold)} commandes notées ; les 8 plus gros CA sont nommées.
             </p>
           </>
         )}
@@ -195,9 +156,9 @@ function Content({ data }: { data: Loaded<SellersData> }) {
             { key: "late_rate", label: "En retard", align: "right", format: optional((v) => fmt.percent(v)) },
           ]}
         />
-      </Section>
+      </Card>
 
-      <Section title="Vendeurs">
+      <Card className="spaced" title="Vendeurs" subtitle="Les données d'Olist ne donnent pas leur nom : seul le début de l'identifiant est affiché">
         <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "top"} onClick={() => setTab("top")}>
             Plus gros chiffres d'affaires
@@ -207,25 +168,19 @@ function Content({ data }: { data: Loaded<SellersData> }) {
           </button>
         </div>
         {tab === "top" ? (
-          <div className="table-card">
-            <DataTable caption="Les 10 vendeurs au plus gros chiffre d'affaires" rows={data.top_sellers} columns={SELLER_COLUMNS} />
-          </div>
+          <DataTable caption="Les 10 vendeurs au plus gros chiffre d'affaires" rows={data.top_sellers} columns={SELLER_COLUMNS} />
         ) : data.watched_sellers.length === 0 ? (
           <Notice>Aucun vendeur n'a {data.watch_min_orders} commandes ou plus avec ces filtres.</Notice>
         ) : (
           <>
-            <div className="table-card">
-              <DataTable caption="Les 10 vendeurs les moins bien notés" rows={data.watched_sellers} columns={SELLER_COLUMNS} />
-            </div>
+            <DataTable caption="Les 10 vendeurs les moins bien notés" rows={data.watched_sellers} columns={SELLER_COLUMNS} />
             <p className="caption">
-              Les 10 vendeurs les moins bien notés parmi ceux qui ont au moins {data.watch_min_orders} commandes (
-              {fmt.number(data.watched_count)} vendeurs). La note et le retard sont ceux de la commande entière, même si elle contient
-              des articles d'autres vendeurs (≈ 1 %).
+              Les 10 moins bien notés parmi les {fmt.number(data.watched_count)} vendeurs qui ont au moins {data.watch_min_orders} commandes.
+              La note et le retard sont ceux de la commande entière, même si elle contient des articles d'autres vendeurs (≈ 1 %).
             </p>
           </>
         )}
-        <p className="caption">Les données d'Olist ne donnent pas le nom des vendeurs : seul le début de leur identifiant est affiché.</p>
-      </Section>
+      </Card>
     </>
   );
 }

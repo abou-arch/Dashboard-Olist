@@ -10,17 +10,23 @@ Deux interfaces affichent les mêmes chiffres, calculés par le même code Pytho
 - **Application web** (React + API FastAPI), à déployer en ligne ;
 - **Application Streamlit**, pratique pour explorer en local.
 
-## Pages
+## Pages de l'application web
+
+Thème sombre et doré, menu latéral, sélecteur de période et d'États en haut de page.
 
 | Page | Contenu |
 |---|---|
-| Vue d'ensemble | CA, commandes, panier moyen, note moyenne, taux de retard, délai de livraison, comparés à la période précédente ; CA mensuel ; top 10 des catégories et des États |
-| Logistique | Délai de livraison, taux et durée des retards, avance sur la date estimée, préparation vendeur, part du port ; note client selon le retard ; taux de retard mensuel ; délai par étape ; délai et retard par État |
-| Satisfaction | Note moyenne, clients satisfaits et insatisfaits, avis commentés ; répartition des notes ; note mensuelle ; note selon la livraison et le nombre d'articles ; catégories les moins et les mieux notées |
-| Vendeurs et catégories | Vendeurs actifs, CA médian, concentration des ventes, petits vendeurs, prix moyen ; courbe de concentration ; CA par État du vendeur ; CA et note par catégorie ; plus gros vendeurs et vendeurs à surveiller |
-| Clients | Clients, clients revenus, CA par client, paiement par carte, mensualités ; clients selon le nombre de commandes ; moyens de paiement ; panier selon les mensualités ; jours et heures d'achat ; carte et top 15 des villes |
+| Tableau de bord | CA, commandes, clients uniques, note moyenne ; évolution des ventes (CA, commandes ou panier moyen) ; ventes par région (carte des États) ; catégories les plus vendues ; statut des commandes ; distribution des délais de livraison |
+| Ventes | CA, commandes, panier moyen, part du port, paiement par carte, mensualités ; CA et panier moyen mensuels ; moyens de paiement ; panier selon les mensualités |
+| Clients | Clients, clients revenus, CA et commandes par client ; clients par mois ; fidélité ; jours et heures d'achat |
+| Produits | Catégories, prix moyen, vendeurs actifs, concentration des ventes ; top 10 des catégories ; courbe de concentration ; CA et note par catégorie ; plus gros vendeurs et vendeurs à surveiller |
+| Géographie | Villes clientes, premier État ; carte des États et des villes ; indicateurs par État ; top 15 des villes ; CA par État du vendeur |
+| Satisfaction | Note moyenne, satisfaits et insatisfaits, avis commentés ; répartition des notes ; note mensuelle ; note selon la livraison et le nombre d'articles ; catégories les moins et les mieux notées |
+| Livraisons | Délai moyen, retards, avance sur la date estimée, préparation vendeur ; distribution des délais ; note selon le retard ; taux de retard mensuel ; délai par étape ; délai par État |
 
-Filtres : période d'achat et États du client, conservés d'une page à l'autre.
+Les filtres (période d'achat, États du client) figurent dans l'adresse et suivent
+la navigation d'une page à l'autre. L'application Streamlit propose les mêmes
+analyses, réparties en 5 pages.
 
 ## Installation
 
@@ -108,9 +114,10 @@ api/
   main.py                  application FastAPI : routes /api et service du site
   pages.py                 données de chaque page (JSON)
 web/
-  src/pages/               pages React
-  src/components/          tuiles, graphiques, filtres, tableaux
-  src/lib/                 appels à l'API, graphiques ECharts, mise en forme, thème
+  src/pages/               les 7 pages React
+  src/components/          tuiles, cartes, graphiques, carte du Brésil, filtres, tableaux
+  src/lib/                 appels à l'API, graphiques ECharts, mise en forme, couleurs
+  src/styles.css           thème sombre et doré (couleurs validées pour le daltonisme)
 olist_dashboard/
   config.py                chemins et règles métier
   data.py                  CSV bruts -> tables orders / items (Parquet)
@@ -169,8 +176,11 @@ Dockerfile, render.yaml    image de production et déploiement sur Render
   défaut, et aucune comparaison n'est affichée si la période précédente en sort.
 - Les catégories de produits utilisent les libellés anglais fournis par Olist.
 
-## Licence des données
+## Licences
 
-Olist, « Brazilian E-Commerce Public Dataset », publié sur Kaggle sous licence
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) :
-usage non commercial, avec attribution.
+- Données : Olist, « Brazilian E-Commerce Public Dataset », publié sur Kaggle sous
+  licence [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) :
+  usage non commercial, avec attribution.
+- Carte des États : [@svg-maps/brazil](https://github.com/VictorCazanave/svg-maps),
+  licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Icônes : [Lucide](https://lucide.dev) (ISC) ; police : Manrope (SIL OFL 1.1).

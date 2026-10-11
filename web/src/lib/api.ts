@@ -21,7 +21,7 @@ export interface PageHeader {
   orders: number;
 }
 
-export type PageName = "overview" | "logistics" | "satisfaction" | "sellers" | "customers";
+export type PageName = "dashboard" | "sales" | "customers" | "products" | "geography" | "satisfaction" | "deliveries";
 
 /** Données d'une page : en-tête commun + contenu propre à la page (``T``). */
 export type PageData<T> = PageHeader & Partial<T>;
@@ -54,67 +54,53 @@ export function fetchPage<T>(page: PageName, filters: Filters, signal?: AbortSig
 // --- Contenu des pages ------------------------------------------------------
 
 export interface Monthly { month: string }
+type Compared<K> = { kpis: K; previous_kpis: K | null };
 
-export interface OverviewData {
-  kpis: OverviewKpis;
-  previous_kpis: OverviewKpis | null;
-  monthly: (Monthly & { revenue: number; orders: number })[];
-  categories: { category: string; revenue: number; share: number }[];
-  by_state: { customer_state: string; revenue: number; orders: number; share: number }[];
-}
-export interface OverviewKpis {
+export interface StateRevenue { customer_state: string; revenue: number; orders: number; customers: number; share: number }
+
+export interface DashboardKpis {
   revenue: number;
   orders: number;
   customers: number;
-  average_basket: number | null;
   average_review: number | null;
-  late_rate: number | null;
-  average_delivery_days: number | null;
+  reviews: number;
 }
-
-export interface LogisticsKpis {
-  delivered: number;
-  average_delivery_days: number | null;
+export interface DashboardData extends Compared<DashboardKpis> {
+  monthly: (Monthly & { revenue: number; orders: number; customers: number })[];
+  monthly_reviews: (Monthly & { review_score: number })[];
+  by_state: StateRevenue[];
+  categories: { category: string; revenue: number; share: number }[];
+  statuses: { status: string; orders: number; share: number }[];
+  delivery_histogram: { days: number; orders: number; label: string }[];
   median_delivery_days: number | null;
-  late_rate: number | null;
-  average_delay_when_late: number | null;
-  median_margin_days: number | null;
-  average_handling_days: number | null;
-  freight_share: number | null;
-}
-export interface LogisticsData {
-  kpis: LogisticsKpis;
-  previous_kpis: LogisticsKpis | null;
-  monthly: (Monthly & { late_rate: number; delivery_days: number; delivered: number })[];
-  stages: (Monthly & { approval: number; handling: number; transit: number })[];
-  stage_labels: Record<"approval" | "handling" | "transit", string>;
-  review_by_delay: { bucket: string; review_score: number | null; orders: number; low_scores: number | null }[];
-  low_score_rates: { very_late: number | null; early: number | null };
-  by_state: {
-    customer_state: string; delivery_days: number; late_rate: number;
-    freight_value: number; review_score: number | null; delivered: number;
-  }[];
 }
 
-export interface SatisfactionKpis {
-  reviewed: number;
-  response_rate: number | null;
-  average_review: number | null;
-  satisfied_share: number | null;
-  dissatisfied_share: number | null;
-  comment_rate: number | null;
-  dissatisfied_comment_rate: number | null;
+export interface SalesKpis {
+  revenue: number;
+  orders: number;
+  average_basket: number | null;
+  freight_share: number | null;
+  credit_card_share: number | null;
+  average_installments: number | null;
 }
-export interface ScoreGroup { review_score: number | null; dissatisfied_share: number | null; orders: number }
-export interface SatisfactionData {
-  kpis: SatisfactionKpis;
-  previous_kpis: SatisfactionKpis | null;
-  monthly: (Monthly & { review_score: number; dissatisfied_share: number; reviewed: number })[];
-  distribution: { stars: number; orders: number; share: number; label: string }[];
-  by_delivery: (ScoreGroup & { group: string })[];
-  by_items: (ScoreGroup & { group: string })[];
-  categories: (ScoreGroup & { category: string })[];
-  category_threshold: number;
+export interface SalesData extends Compared<SalesKpis> {
+  monthly: (Monthly & { revenue: number; orders: number; customers: number })[];
+  payments: { payment_type: string; label: string; orders: number; basket: number; share: number }[];
+  installments: { group: string; orders: number; basket: number | null; share: number }[];
+}
+
+export interface CustomerKpis {
+  customers: number;
+  repeat_rate: number | null;
+  orders_per_customer: number | null;
+  revenue_per_customer: number | null;
+  credit_card_share: number | null;
+  average_installments: number | null;
+}
+export interface CustomersData extends Compared<CustomerKpis> {
+  monthly: (Monthly & { customers: number; orders: number })[];
+  loyalty: { group: string; customers: number; share: number }[];
+  heatmap: { days: string[]; hours: number[]; values: number[][] };
 }
 
 export interface SellerKpis {
@@ -133,14 +119,11 @@ export interface CategoryStats {
   category: string; revenue: number; orders: number; sellers: number; average_price: number;
   share: number; review_score: number | null; reviews: number; late_rate: number | null;
 }
-export interface SellersData {
-  kpis: SellerKpis;
-  previous_kpis: SellerKpis | null;
-  concentration: { seller_share: number; revenue_share: number }[];
-  by_seller_state: { seller_state: string; revenue: number; sellers: number; share: number }[];
+export interface ProductsData extends Compared<SellerKpis> {
   categories: CategoryStats[];
   category_threshold: number;
   average_review: number | null;
+  concentration: { seller_share: number; revenue_share: number }[];
   top_sellers: Seller[];
   watched_sellers: Seller[];
   watched_count: number;
@@ -148,21 +131,51 @@ export interface SellersData {
   small_seller_orders: number;
 }
 
-export interface CustomerKpis {
-  customers: number;
-  repeat_rate: number | null;
-  orders_per_customer: number | null;
-  revenue_per_customer: number | null;
-  credit_card_share: number | null;
-  average_installments: number | null;
-}
 export interface City { city: string; revenue: number; customers: number; share: number; lat: number | null; lng: number | null }
-export interface CustomersData {
-  kpis: CustomerKpis;
-  previous_kpis: CustomerKpis | null;
-  loyalty: { group: string; customers: number; share: number }[];
-  payments: { payment_type: string; label: string; orders: number; basket: number; share: number }[];
-  installments: { group: string; orders: number; basket: number | null; share: number }[];
-  heatmap: { days: string[]; hours: number[]; values: number[][] };
+export interface GeographyData {
+  by_state: (StateRevenue & { delivery_days: number | null; late_rate: number | null; freight_value: number | null })[];
+  by_seller_state: { seller_state: string; revenue: number; sellers: number; share: number }[];
   cities: City[];
+}
+
+export interface SatisfactionKpis {
+  reviewed: number;
+  response_rate: number | null;
+  average_review: number | null;
+  satisfied_share: number | null;
+  dissatisfied_share: number | null;
+  comment_rate: number | null;
+  dissatisfied_comment_rate: number | null;
+}
+export interface ScoreGroup { review_score: number | null; dissatisfied_share: number | null; orders: number }
+export interface SatisfactionData extends Compared<SatisfactionKpis> {
+  monthly: (Monthly & { review_score: number; dissatisfied_share: number; reviewed: number })[];
+  distribution: { stars: number; orders: number; share: number; label: string }[];
+  by_delivery: (ScoreGroup & { group: string })[];
+  by_items: (ScoreGroup & { group: string })[];
+  categories: (ScoreGroup & { category: string })[];
+  category_threshold: number;
+}
+
+export interface LogisticsKpis {
+  delivered: number;
+  average_delivery_days: number | null;
+  median_delivery_days: number | null;
+  late_rate: number | null;
+  average_delay_when_late: number | null;
+  median_margin_days: number | null;
+  average_handling_days: number | null;
+  freight_share: number | null;
+}
+export interface DeliveriesData extends Compared<LogisticsKpis> {
+  monthly: (Monthly & { late_rate: number; delivery_days: number; delivered: number })[];
+  stages: (Monthly & { approval: number; handling: number; transit: number })[];
+  stage_labels: Record<"approval" | "handling" | "transit", string>;
+  histogram: { days: number; orders: number; label: string }[];
+  review_by_delay: { bucket: string; review_score: number | null; orders: number; low_scores: number | null }[];
+  low_score_rates: { very_late: number | null; early: number | null };
+  by_state: {
+    customer_state: string; delivery_days: number; late_rate: number;
+    freight_value: number; review_score: number | null; delivered: number;
+  }[];
 }

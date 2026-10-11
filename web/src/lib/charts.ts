@@ -1,5 +1,5 @@
-// Options ECharts des graphiques du dashboard, sur le modèle de olist_dashboard/charts.py :
-// une teinte par série, marques fines, grille discrète, étiquettes sélectives.
+// Options ECharts des graphiques du dashboard (thème sombre et doré) : une teinte
+// par série, marques fines, grille discrète, étiquettes sélectives.
 import type { ChartOption } from "../components/Chart";
 import { shortMonth } from "./format";
 import type { Tokens } from "./theme";
@@ -22,8 +22,8 @@ function base(t: Tokens) {
     textStyle: { fontFamily: t.font, color: t.text2 },
     tooltip: {
       confine: true,
-      backgroundColor: t.surface,
-      borderColor: t.grid,
+      backgroundColor: t.card,
+      borderColor: t.baseline,
       borderWidth: 1,
       padding: [8, 10],
       textStyle: { color: t.text, fontSize: 12, fontFamily: t.font },
@@ -33,6 +33,25 @@ function base(t: Tokens) {
 }
 
 const axisLabel = (t: Tokens) => ({ color: t.muted, fontSize: 12 });
+
+/** Dégradé vertical de ``color`` (opaque à 30 % en haut) vers transparent. */
+const fade = (color: string, opacity = 0.3) => ({
+  type: "linear",
+  x: 0,
+  y: 0,
+  x2: 0,
+  y2: 1,
+  colorStops: [
+    { offset: 0, color: withAlpha(color, opacity) },
+    { offset: 1, color: withAlpha(color, 0) },
+  ],
+});
+
+/** « #e3c79f » + 0,3 -> « rgba(227, 199, 159, 0.3) ». */
+function withAlpha(hex: string, alpha: number): string {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 // --- Barres horizontales ------------------------------------------------------
 
@@ -130,8 +149,8 @@ export function trendChart({ months, values, tooltip, yFormat, zeroBased = true 
         symbol: "circle",
         symbolSize: 8,
         lineStyle: { width: 2, color: t.accent },
-        itemStyle: { color: t.accent, borderColor: t.surface, borderWidth: 2 },
-        areaStyle: zeroBased ? { color: t.accentWash } : undefined,
+        itemStyle: { color: t.accent, borderColor: t.card, borderWidth: 2 },
+        areaStyle: zeroBased ? { color: fade(t.accent) } : undefined,
       },
     ],
   };
@@ -178,7 +197,7 @@ export function stackedChart(
       data: s.values,
       barMaxWidth: 24,
       // Le contour couleur du fond crée l'espace entre les segments.
-      itemStyle: { borderColor: t.surface, borderWidth: 1 },
+      itemStyle: { borderColor: t.card, borderWidth: 1 },
     })),
   };
 }
@@ -242,7 +261,7 @@ export function scatterChart(input: ScatterInput, t: Tokens): ChartOption {
         symbolSize: 11,
         // Écarte verticalement les étiquettes qui se chevauchent.
         labelLayout: { moveOverlap: "shiftY" },
-        itemStyle: { color: t.accent, borderColor: t.surface, borderWidth: 2 },
+        itemStyle: { color: t.accent, borderColor: t.card, borderWidth: 2 },
         data: points.map((p, i) => ({
           value: [p.x, p.y],
           label: {
@@ -314,7 +333,7 @@ export function heatmapChart(
       formatter: (p: TooltipParam & { value: number[] }) =>
         tooltipHtml(`${rows[p.value[1]]}, ${columns[p.value[0]]}`, [`${p.value[2].toLocaleString("fr-FR")} ${unitName}`]),
     },
-    series: [{ type: "heatmap", data, itemStyle: { borderColor: t.surface, borderWidth: 2, borderRadius: 2 } }],
+    series: [{ type: "heatmap", data, itemStyle: { borderColor: t.card, borderWidth: 2, borderRadius: 2 } }],
   };
 }
 
@@ -358,7 +377,7 @@ export function concentrationChart(
         data: curve.map((p) => [p.seller_share, p.revenue_share]),
         showSymbol: false,
         lineStyle: { width: 2, color: t.accent },
-        areaStyle: { color: t.accentWash },
+        areaStyle: { color: fade(t.accent, 0.22) },
       },
       {
         type: "line",
@@ -374,7 +393,7 @@ export function concentrationChart(
             data: [[highlight.x, highlight.y]],
             silent: true,
             symbolSize: 10,
-            itemStyle: { color: t.accent, borderColor: t.surface, borderWidth: 2 },
+            itemStyle: { color: t.accent, borderColor: t.card, borderWidth: 2 },
             label: { show: true, position: "right", formatter: highlight.label, color: t.text, fontSize: 12 },
           }]
         : []),
@@ -418,7 +437,7 @@ export function cityMapChart(cities: MapCity[], highlighted: number, t: Tokens):
         type: "scatter",
         data: cities.map((c) => [c.lng, c.lat]),
         symbolSize: 3,
-        itemStyle: { color: t.baseline },
+        itemStyle: { color: t.text2, opacity: 0.35 },
         tooltip: { formatter: tooltipFor(cities) },
         large: true,
         largeThreshold: 5000,
@@ -427,8 +446,95 @@ export function cityMapChart(cities: MapCity[], highlighted: number, t: Tokens):
         type: "scatter",
         data: top.map((c) => [c.lng, c.lat]),
         symbolSize: (_: unknown, p: TooltipParam) => Math.max(4, Math.sqrt(top[p.dataIndex].size / largest) * 40),
-        itemStyle: { color: t.accent, opacity: 0.6, borderColor: t.surface, borderWidth: 1 },
+        itemStyle: { color: t.accent, opacity: 0.6, borderColor: t.card, borderWidth: 1 },
         tooltip: { formatter: tooltipFor(top) },
+      },
+    ],
+  };
+}
+
+
+// --- Histogramme -------------------------------------------------------------------
+
+/** Colonnes contiguës (une par classe) ; graduations de ``tickEvery`` en ``tickEvery``. */
+export function histogramChart(
+  bins: { label: string; value: number }[],
+  tooltip: (index: number) => string,
+  t: Tokens,
+  tickEvery = 10,
+): ChartOption {
+  const b = base(t);
+  return {
+    ...b,
+    grid: { left: 4, right: 8, top: 12, bottom: 4, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: bins.map((bin) => bin.label),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: t.baseline } },
+      axisLabel: { ...axisLabel(t), interval: (i: number) => i % tickEvery === 0 || i === bins.length - 1 },
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { color: t.grid } },
+      axisLabel: { ...axisLabel(t), formatter: (v: number) => v.toLocaleString("fr-FR") },
+    },
+    tooltip: {
+      ...b.tooltip,
+      trigger: "axis",
+      axisPointer: { type: "shadow", shadowStyle: { color: t.accentWash } },
+      formatter: (params: TooltipParam[]) => tooltip(params[0].dataIndex),
+    },
+    series: [
+      {
+        type: "bar",
+        data: bins.map((bin) => bin.value),
+        barCategoryGap: "18%",
+        itemStyle: { color: t.accentStrong, borderRadius: [2, 2, 0, 0] },
+        emphasis: { itemStyle: { color: t.accent } },
+      },
+    ],
+  };
+}
+
+// --- Anneau -------------------------------------------------------------------------
+
+/** Anneau de parts (≤ 4 segments) ; le total s'affiche au centre. */
+export function donutChart(
+  slices: { name: string; value: number; color: string }[],
+  center: { value: string; label: string },
+  t: Tokens,
+): ChartOption {
+  const b = base(t);
+  return {
+    ...b,
+    tooltip: {
+      ...b.tooltip,
+      trigger: "item",
+      formatter: (p: TooltipParam & { percent: number }) =>
+        tooltipHtml(slices[p.dataIndex].name, [
+          `${slices[p.dataIndex].value.toLocaleString("fr-FR")} commandes`,
+          `${p.percent.toFixed(1).replace(".", ",")} %`,
+        ]),
+    },
+    title: {
+      text: center.value,
+      subtext: center.label,
+      left: "center",
+      top: "center",
+      itemGap: 4,
+      textStyle: { color: t.text, fontSize: 22, fontWeight: 700, fontFamily: t.font },
+      subtextStyle: { color: t.text2, fontSize: 13, fontFamily: t.font },
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["66%", "86%"],
+        avoidLabelOverlap: false,
+        label: { show: false },
+        padAngle: 1,
+        itemStyle: { borderColor: t.card, borderWidth: 2, borderRadius: 3 },
+        data: slices.map((s) => ({ name: s.name, value: s.value, itemStyle: { color: s.color } })),
       },
     ],
   };

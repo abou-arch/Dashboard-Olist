@@ -1,15 +1,15 @@
 // Graphique ECharts : s'adapte à la largeur de son conteneur.
-import { BarChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
+import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from "echarts/charts";
 import {
-  GridComponent, LegendComponent, MarkLineComponent, TooltipComponent, VisualMapComponent,
+  GridComponent, LegendComponent, MarkLineComponent, TitleComponent, TooltipComponent, VisualMapComponent,
 } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
 
 echarts.use([
-  BarChart, HeatmapChart, LineChart, ScatterChart,
-  GridComponent, LegendComponent, MarkLineComponent, TooltipComponent, VisualMapComponent,
+  BarChart, HeatmapChart, LineChart, PieChart, ScatterChart,
+  GridComponent, LegendComponent, MarkLineComponent, TitleComponent, TooltipComponent, VisualMapComponent,
   CanvasRenderer,
 ]);
 

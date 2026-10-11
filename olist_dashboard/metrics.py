@@ -67,10 +67,14 @@ def previous_period(start: pd.Timestamp, end: pd.Timestamp) -> tuple[pd.Timestam
 
 
 def monthly_sales(orders: pd.DataFrame) -> pd.DataFrame:
-    """CA et nombre de commandes par mois d'achat."""
+    """CA, nombre de commandes et de clients distincts par mois d'achat."""
     sales = sold(orders)
     month = sales["purchase_date"].dt.to_period("M").dt.to_timestamp()
-    out = sales.groupby(month).agg(revenue=("revenue", "sum"), orders=("order_id", "count"))
+    out = sales.groupby(month).agg(
+        revenue=("revenue", "sum"),
+        orders=("order_id", "count"),
+        customers=("customer_unique_id", "nunique"),
+    )
     out.index.name = "month"
     return out.reset_index()
 
@@ -84,11 +88,41 @@ def revenue_by_category(items: pd.DataFrame, top: int = 10) -> pd.DataFrame:
     return out.head(top).rename_axis("category").reset_index()
 
 
-def revenue_by_state(orders: pd.DataFrame, top: int = 10) -> pd.DataFrame:
+def revenue_by_state(orders: pd.DataFrame, top: int | None = 10) -> pd.DataFrame:
+    """CA et commandes par État du client, du plus gros au plus petit (``top=None`` : tous)."""
     sales = sold(orders)
-    out = sales.groupby("customer_state").agg(revenue=("revenue", "sum"), orders=("order_id", "count"))
+    out = sales.groupby("customer_state").agg(
+        revenue=("revenue", "sum"),
+        orders=("order_id", "count"),
+        customers=("customer_unique_id", "nunique"),
+    )
     out["share"] = out["revenue"] / out["revenue"].sum()
-    return out.sort_values("revenue", ascending=False).head(top).reset_index()
+    out = out.sort_values("revenue", ascending=False)
+    return (out if top is None else out.head(top)).reset_index()
+
+
+# Statuts Olist regroupés pour le suivi des commandes, dans l'ordre d'affichage.
+STATUS_GROUPS = {
+    "delivered": "Livrées",
+    "shipped": "En transit",
+    "invoiced": "En préparation",
+    "processing": "En préparation",
+    "approved": "En préparation",
+    "created": "En préparation",
+    "canceled": "Annulées",
+    "unavailable": "Annulées",
+}
+STATUS_ORDER = ["Livrées", "En transit", "En préparation", "Annulées"]
+
+
+def order_status_breakdown(orders: pd.DataFrame) -> pd.DataFrame:
+    """Nombre et part des commandes par statut regroupé (toutes les commandes, annulées comprises)."""
+    groups = orders["order_status"].map(STATUS_GROUPS).fillna("En préparation")
+    counts = groups.value_counts().reindex(STATUS_ORDER, fill_value=0)
+    out = counts.rename("orders").rename_axis("status").reset_index()
+    total = out["orders"].sum()
+    out["share"] = out["orders"] / total if total else 0.0
+    return out
 
 
 # --- Logistique --------------------------------------------------------------
@@ -572,4 +606,21 @@ def revenue_by_city(orders: pd.DataFrame) -> pd.DataFrame:
     out = out.sort_values("revenue", ascending=False).reset_index()
     # « sao paulo » -> « Sao Paulo »
     out["city"] = out["customer_city"].str.title() + " (" + out["customer_state"] + ")"
+    return out
+
+
+
+HISTOGRAM_MAX_DAYS = 60
+
+
+def delivery_days_histogram(orders: pd.DataFrame, max_days: int = HISTOGRAM_MAX_DAYS) -> pd.DataFrame:
+    """Commandes livrées par nombre de jours entiers entre l'achat et la livraison.
+
+    La dernière classe regroupe les livraisons de ``max_days`` jours ou plus.
+    """
+    days = np.floor(delivered(orders)["delivery_days"]).clip(upper=max_days).astype("int64")
+    counts = days.value_counts().reindex(range(max_days + 1), fill_value=0)
+    out = counts.rename("orders").rename_axis("days").reset_index()
+    out["label"] = out["days"].astype(str)
+    out.loc[out["days"] == max_days, "label"] = f"{max_days}+"
     return out

@@ -140,6 +140,7 @@ with st.expander("Voir les données en tableau"):
             "month": "Mois",
             "revenue": st.column_config.NumberColumn("CA (R$)", format="%.2f"),
             "orders": st.column_config.NumberColumn("Commandes"),
+            "customers": st.column_config.NumberColumn("Clients"),
         },
         hide_index=True,
         width="stretch",

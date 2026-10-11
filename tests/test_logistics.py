@@ -82,3 +82,11 @@ def test_logistics_by_state(orders):
     assert out["customer_state"].tolist() == ["SP", "RJ"]
     assert out["delivered"].tolist() == [2, 2]
     assert out.set_index("customer_state").loc["RJ", "late_rate"] == 0.5
+
+
+def test_delivery_days_histogram(orders):
+    out = metrics.delivery_days_histogram(orders, max_days=9)
+    assert len(out) == 10
+    assert out.set_index("days").loc[9, "orders"] == 3  # livrées en 10 j : classe « 9+ »
+    assert out.loc[8, "orders"] == 1
+    assert out.iloc[-1]["label"] == "9+"

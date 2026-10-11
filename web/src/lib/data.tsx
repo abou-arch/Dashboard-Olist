@@ -1,7 +1,7 @@
 // Métadonnées (bornes, États), filtres portés par l'adresse de la page, et
 // chargement des données de chaque page.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { fetchMeta, fetchPage, type Filters, type Meta, type PageData, type PageName } from "./api";
 
@@ -42,7 +42,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function useFilters() {
   const meta = useMeta();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const filters: Filters = useMemo(() => {
     const date = (key: string, fallback: string) => {
@@ -66,7 +68,8 @@ export function useFilters() {
     if (next.end !== meta.default_end) out.set("au", next.end);
     if (next.states.length) out.set("etats", [...next.states].sort().join(","));
     // Virgules laissées lisibles dans l'adresse : ?etats=RJ,SP plutôt que RJ%2CSP.
-    setParams(out.toString().replace(/%2C/g, ","), { replace: true });
+    const search = out.toString().replace(/%2C/g, ",");
+    navigate({ pathname, search: search ? `?${search}` : "" }, { replace: true });
   };
 
   const isDefault =

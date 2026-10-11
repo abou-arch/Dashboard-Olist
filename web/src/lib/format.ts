@@ -67,3 +67,9 @@ export function dateLabel(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
   return `${day}/${month}/${year}`;
 }
+
+/** « 2017-01-01 » -> « 1 janv. 2017 ». */
+export function longDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
+}

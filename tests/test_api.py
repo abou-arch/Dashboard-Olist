@@ -27,24 +27,35 @@ def test_every_page_answers(client, page):
     data = response.json()
     assert data["orders"] == 3
     assert data["period"]["previous"] == {"start": "2017-01-29", "end": "2017-02-28"}
-    assert data["kpis"] is not None
+    assert set(data) > {"period", "states", "orders"}  # contenu propre à la page
 
 
-def test_overview_content(client):
-    data = client.get("/api/pages/overview", params={"states": "sp"}).json()
+def test_dashboard_content(client):
+    data = client.get("/api/pages/dashboard", params={"states": "sp"}).json()
     assert data["states"] == ["SP"]
     assert data["kpis"]["revenue"] == 33.0  # o1 ; o3 (SP) est annulée
-    assert data["monthly"] == [{"month": "2017-03-01", "revenue": 33.0, "orders": 1}]
+    assert data["kpis"]["reviews"] == 1
+    assert data["monthly"] == [{"month": "2017-03-01", "revenue": 33.0, "orders": 1, "customers": 1}]
+    statuses = {row["status"]: row["orders"] for row in data["statuses"]}
+    assert statuses == {"Livrées": 1, "En transit": 0, "En préparation": 0, "Annulées": 1}
+    assert len(data["delivery_histogram"]) == 61
+
+
+def test_geography_merges_delivery_by_state(client):
+    data = client.get("/api/pages/geography").json()
+    rj = next(row for row in data["by_state"] if row["customer_state"] == "RJ")
+    assert rj["revenue"] == 55.0
+    assert rj["late_rate"] == 1.0
 
 
 def test_no_previous_period_before_reliable_range(client):
-    data = client.get("/api/pages/overview", params={"start": "2017-01-01", "end": "2017-03-31"}).json()
+    data = client.get("/api/pages/dashboard", params={"start": "2017-01-01", "end": "2017-03-31"}).json()
     assert data["period"]["previous"] is None
     assert data["previous_kpis"] is None
 
 
 def test_empty_selection_returns_only_header(client):
-    data = client.get("/api/pages/overview", params={"start": "2018-01-01", "end": "2018-01-31"}).json()
+    data = client.get("/api/pages/dashboard", params={"start": "2018-01-01", "end": "2018-01-31"}).json()
     assert data["orders"] == 0
     assert "kpis" not in data
 
@@ -54,7 +65,7 @@ def test_empty_selection_returns_only_header(client):
     [({"states": "XX"}, 422), ({"start": "2018-02-01", "end": "2018-01-01"}, 422), ({"start": "hier"}, 422)],
 )
 def test_invalid_filters(client, params, status):
-    assert client.get("/api/pages/overview", params=params).status_code == status
+    assert client.get("/api/pages/dashboard", params=params).status_code == status
 
 
 def test_unknown_routes(client):
