@@ -1,7 +1,7 @@
 # Image de production : front React compilé + API FastAPI, sur un seul port.
 
 # 1. Compilation du front (les scripts d'installation des paquets ne sont pas exécutés)
-FROM node:22-slim AS web
+FROM node:25-slim AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
