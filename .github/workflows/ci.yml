@@ -1,0 +1,78 @@
+# Vérifications lancées à chaque push et pull request. Render ne déploie un
+# commit de main que si elles passent (autoDeployTrigger: checksPass).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Lecture seule : la CI n'a besoin d'aucun droit d'écriture sur le dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: API et tests Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt pip-audit
+      - run: python -m pytest -q
+      - name: Audit des dépendances de production
+        run: pip-audit -r requirements-api.txt
+
+  web:
+    name: Front React
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --ignore-scripts --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Audit des dépendances
+        run: npm audit --audit-level=high
+
+  docker:
+    name: Image Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: docker build -t dashboard-olist .
+      - name: Démarrage et en-têtes de sécurité
+        run: |
+          docker run -d --name app -p 8000:8000 dashboard-olist
+          for i in $(seq 30); do curl -fs http://localhost:8000/api/meta > /dev/null && break; sleep 2; done
+          curl -fsS -D headers.txt -o /dev/null http://localhost:8000/ && cat headers.txt
+          grep -qi '^content-security-policy:' headers.txt
+          grep -qi '^strict-transport-security:' headers.txt
+          if grep -qi '^server:' headers.txt; then exit 1; fi
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/docs)" = 404
+          docker exec app id -un | grep -qx app
+      - if: failure()
+        run: docker logs app

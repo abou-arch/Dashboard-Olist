@@ -64,7 +64,7 @@ cd web && npm run dev                # site sur http://localhost:5173
 ```
 
 Le site relaie les appels `/api` vers l'API. Documentation interactive de l'API :
-http://localhost:8000/api/docs.
+http://localhost:8000/api/docs (masquée en production).
 
 ### En production
 
@@ -87,12 +87,36 @@ docker run -p 8000:8000 dashboard-olist
 
 Sur [Render](https://render.com) (offre gratuite) : *New* > *Blueprint*, choisissez
 ce dépôt ; `render.yaml` décrit le service. L'application se redéploie à chaque
-push sur la branche principale. L'offre gratuite met le service en veille après
+push sur `main`, une fois les vérifications de la CI passées. L'offre gratuite met le service en veille après
 15 minutes sans visite : la première page suivante met environ une minute à
 s'afficher. L'API utilise environ 350 Mo de mémoire (limite gratuite : 512 Mo).
 
 Toute plateforme qui exécute une image Docker convient (Railway, Fly.io, Google
 Cloud Run…) : l'application écoute sur le port indiqué par la variable `PORT`.
+
+### Sécurité
+
+Le site est public et en lecture seule : pas de compte, pas de base de données,
+aucun secret à stocker. Les protections portent donc sur le transport, le
+navigateur et la disponibilité.
+
+| Protection | Où |
+|---|---|
+| HTTPS imposé (certificat fourni par l'hébergeur, en-tête HSTS) | `api/security.py` |
+| Politique de contenu stricte (CSP) : le site ne charge que ses propres fichiers, aucun CDN | `api/security.py` |
+| Anti-iframe, anti-détection de type, pas de référent externe, caméra/micro/position bloqués | `api/security.py` |
+| Limite de 120 requêtes d'API par minute et par visiteur (réponse 429) | `api/security.py` |
+| Un calcul à la fois, file d'attente bornée (réponse 503), 50 connexions au plus | `api/main.py`, `Dockerfile` |
+| Paramètres validés : dates bornées, États connus, longueur limitée (réponse 422) | `api/main.py` |
+| Documentation de l'API et en-tête `Server` masqués en production | `api/main.py`, `Dockerfile` |
+| Image minimale, utilisateur sans droits, code en lecture seule, sans scripts npm | `Dockerfile` |
+| Tests, compilation, audit des dépendances et contrôle de l'image à chaque push | `.github/workflows/ci.yml` |
+| Déploiement seulement si la CI passe | `render.yaml` |
+| Mises à jour de dépendances proposées chaque semaine | `.github/dependabot.yml` |
+
+Variables d'environnement (déjà réglées dans le `Dockerfile`) : `APP_ENV=production`,
+`TRUST_PROXY=1` (adresse du visiteur lue dans l'en-tête de l'hébergeur),
+`RATE_LIMIT_PER_MINUTE` (0 désactive la limite).
 
 ## Application Streamlit
 
@@ -103,8 +127,10 @@ streamlit run app.py
 ## Tests
 
 ```bash
-pytest                               # calculs, données et API
+pytest                               # calculs, données, API et sécurité
 cd web && npm test                   # mise en forme et écarts (front)
+pip-audit -r requirements-api.txt    # failles connues des dépendances Python (pip install pip-audit)
+cd web && npm audit                  # failles connues des dépendances du site
 ```
 
 ## Structure
@@ -112,6 +138,7 @@ cd web && npm test                   # mise en forme et écarts (front)
 ```
 api/
   main.py                  application FastAPI : routes /api et service du site
+  security.py              en-têtes de sécurité et limite de requêtes
   pages.py                 données de chaque page (JSON)
 web/
   src/pages/               les 7 pages React
@@ -135,6 +162,7 @@ views/customers.py         page « Clients »
 scripts/build_dataset.py   construction des tables Parquet
 tests/                     tests unitaires (pytest)
 Dockerfile, render.yaml    image de production et déploiement sur Render
+.github/                   CI (tests, audits, image) et mises à jour Dependabot
 ```
 
 ## Définitions
