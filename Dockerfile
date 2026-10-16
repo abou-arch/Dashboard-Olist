@@ -9,7 +9,7 @@ COPY web/ ./
 RUN npm run build
 
 # 2. API Python, qui sert aussi le front compilé
-FROM python:3.13-slim
+FROM python:3.14-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
