@@ -4,5 +4,8 @@ services:
     name: dashboard-olist
     runtime: docker
     plan: free
+    branch: main
     healthCheckPath: /api/meta
-    autoDeploy: true
+    # Ne déploie un nouveau commit de main que si les vérifications GitHub
+    # (tests, compilation, audit des dépendances) sont passées.
+    autoDeployTrigger: checksPass
