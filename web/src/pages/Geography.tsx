@@ -19,7 +19,7 @@ export function Geography() {
   const { filters } = useFilters();
   const state = usePageData<GeographyData>("geography", filters);
   return (
-    <Page title="Géographie" intro="Où sont les clients et d'où viennent les ventes" state={state}>
+    <Page title="Géographie" lead="Un pays, vingt-sept États." intro="Où sont les clients et d'où viennent les ventes" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );
@@ -78,7 +78,7 @@ function Content({ data }: { data: Loaded<GeographyData> }) {
       </Grid>
 
       <Grid cols="2">
-        <Card title="Chiffre d'affaires par État" subtitle="Plus la couleur est claire, plus l'État pèse">
+        <Card title="Chiffre d'affaires par État" subtitle="Plus la couleur est foncée, plus l'État pèse">
           <BrazilMap
             values={values}
             t={t}

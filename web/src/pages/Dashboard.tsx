@@ -17,7 +17,7 @@ export function Dashboard() {
   const { filters } = useFilters();
   const state = usePageData<DashboardData>("dashboard", filters);
   return (
-    <Page title="Tableau de bord" intro="Vue d'ensemble des performances de la plateforme Olist" state={state}>
+    <Page title="Tableau de bord" lead="L’essentiel en un coup d’œil." intro="Vue d'ensemble des performances de la plateforme Olist" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );

@@ -15,7 +15,7 @@ export function Customers() {
   const { filters } = useFilters();
   const state = usePageData<CustomersData>("customers", filters);
   return (
-    <Page title="Clients" intro="Qui achète, à quelle fréquence et à quel moment" state={state}>
+    <Page title="Clients" lead="Une fois, ou pour de bon." intro="Qui achète, à quelle fréquence et à quel moment" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );

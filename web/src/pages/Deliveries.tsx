@@ -16,7 +16,7 @@ export function Deliveries() {
   const { filters } = useFilters();
   const state = usePageData<DeliveriesData>("deliveries", filters);
   return (
-    <Page title="Livraisons" intro="Délais et retards, commandes livrées uniquement" state={state}>
+    <Page title="Livraisons" lead="À l’heure, ou pas." intro="Délais et retards, commandes livrées uniquement" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );

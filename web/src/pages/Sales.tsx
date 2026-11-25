@@ -16,7 +16,7 @@ export function Sales() {
   const { filters } = useFilters();
   const state = usePageData<SalesData>("sales", filters);
   return (
-    <Page title="Ventes" intro="Chiffre d'affaires, panier moyen et moyens de paiement" state={state}>
+    <Page title="Ventes" lead="Ce qui rentre, et quand." intro="Chiffre d'affaires, panier moyen et moyens de paiement" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );

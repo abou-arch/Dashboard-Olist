@@ -12,7 +12,9 @@ Deux interfaces affichent les mêmes chiffres, calculés par le même code Pytho
 
 ## Pages de l'application web
 
-Thème sombre et doré, menu latéral, sélecteur de période et d'États en haut de page.
+Thème clair inspiré du template Seren (barre de navigation flottante, cartes arrondies) aux couleurs du
+portfolio [aboucamara.org](https://www.aboucamara.org) : fond crème, accent laiton, police DM Sans.
+Sélecteur de période et d'États en haut de page.
 
 | Page | Contenu |
 |---|---|
@@ -144,7 +146,7 @@ web/
   src/pages/               les 7 pages React
   src/components/          tuiles, cartes, graphiques, carte du Brésil, filtres, tableaux
   src/lib/                 appels à l'API, graphiques ECharts, mise en forme, couleurs
-  src/styles.css           thème sombre et doré (couleurs validées pour le daltonisme)
+  src/styles.css           thème clair et laiton (couleurs validées pour le daltonisme)
 olist_dashboard/
   config.py                chemins et règles métier
   data.py                  CSV bruts -> tables orders / items (Parquet)
@@ -211,4 +213,4 @@ Dockerfile, render.yaml    image de production et déploiement sur Render
   usage non commercial, avec attribution.
 - Carte des États : [@svg-maps/brazil](https://github.com/VictorCazanave/svg-maps),
   licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- Icônes : [Lucide](https://lucide.dev) (ISC) ; police : Manrope (SIL OFL 1.1).
+- Icônes : [Lucide](https://lucide.dev) (ISC) ; police : DM Sans (SIL OFL 1.1).

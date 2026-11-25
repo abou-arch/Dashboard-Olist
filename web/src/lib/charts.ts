@@ -1,4 +1,4 @@
-// Options ECharts des graphiques du dashboard (thème sombre et doré) : une teinte
+// Options ECharts des graphiques du dashboard (thème clair, accent laiton) : une teinte
 // par série, marques fines, grille discrète, étiquettes sélectives.
 import type { ChartOption } from "../components/Chart";
 import { shortMonth } from "./format";

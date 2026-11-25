@@ -16,7 +16,7 @@ export function Satisfaction() {
   const { filters } = useFilters();
   const state = usePageData<SatisfactionData>("satisfaction", filters);
   return (
-    <Page title="Satisfaction" intro="Avis laissés par les clients après leur commande, de 1 à 5 étoiles" state={state}>
+    <Page title="Satisfaction" lead="Ce que disent les clients." intro="Avis laissés par les clients après leur commande, de 1 à 5 étoiles" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );
