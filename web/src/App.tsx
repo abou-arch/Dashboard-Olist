@@ -1,6 +1,4 @@
-import {
-  ChartNoAxesCombined, Globe, House, Package, ShoppingBag, SmilePlus, Truck, Users, type LucideIcon,
-} from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router";
 
 import { Notice } from "./components/Page";
@@ -13,14 +11,16 @@ import { Products } from "./pages/Products";
 import { Sales } from "./pages/Sales";
 import { Satisfaction } from "./pages/Satisfaction";
 
-const PAGES: { path: string; title: string; icon: LucideIcon; element: React.ReactNode }[] = [
-  { path: "/", title: "Tableau de bord", icon: House, element: <Dashboard /> },
-  { path: "/ventes", title: "Ventes", icon: ChartNoAxesCombined, element: <Sales /> },
-  { path: "/clients", title: "Clients", icon: Users, element: <Customers /> },
-  { path: "/produits", title: "Produits", icon: Package, element: <Products /> },
-  { path: "/geographie", title: "Géographie", icon: Globe, element: <Geography /> },
-  { path: "/satisfaction", title: "Satisfaction", icon: SmilePlus, element: <Satisfaction /> },
-  { path: "/livraisons", title: "Livraisons", icon: Truck, element: <Deliveries /> },
+const PORTFOLIO = "https://www.aboucamara.org";
+
+const PAGES: { path: string; title: string; element: React.ReactNode }[] = [
+  { path: "/", title: "Tableau de bord", element: <Dashboard /> },
+  { path: "/ventes", title: "Ventes", element: <Sales /> },
+  { path: "/clients", title: "Clients", element: <Customers /> },
+  { path: "/produits", title: "Produits", element: <Products /> },
+  { path: "/geographie", title: "Géographie", element: <Geography /> },
+  { path: "/satisfaction", title: "Satisfaction", element: <Satisfaction /> },
+  { path: "/livraisons", title: "Livraisons", element: <Deliveries /> },
 ];
 
 export function App() {
@@ -28,7 +28,8 @@ export function App() {
     <MetaProvider>
       {(meta) => (
         <div className="app">
-          <Sidebar />
+          <a className="skip-link" href="#contenu">Aller au contenu</a>
+          <TopNav />
           <main className="main" id="contenu">
             {meta.status === "ready" ? (
               <Routes>
@@ -47,45 +48,79 @@ export function App() {
               </div>
             )}
           </main>
+          <SiteFooter />
         </div>
       )}
     </MetaProvider>
   );
 }
 
-function Sidebar() {
+/** Barre flottante : marque, pages, lien vers le portfolio. */
+function TopNav() {
   // Les filtres (dans l'adresse) suivent la navigation d'une page à l'autre.
   const { search } = useLocation();
   return (
-    <aside className="sidebar">
-      <NavLink to={{ pathname: "/", search }} className="brand" aria-label="Olist, tableau de bord">
-        <Logo />
-        <span className="brand-name">olist</span>
-        <span className="brand-tagline">Analyse E-commerce</span>
-      </NavLink>
-      <nav className="nav" aria-label="Pages">
-        {PAGES.map(({ path, title, icon: Icon }) => (
-          <NavLink key={path} to={{ pathname: path, search }} end>
-            <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-            {title}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="promo">
-        <ShoppingBag size={64} strokeWidth={1.2} aria-hidden="true" />
-        <strong>Données réelles Olist Brésil</strong>
-        <p>Analyse complète des commandes, clients, produits et livraisons, 2016-2018.</p>
+    <header className="topbar">
+      <div className="topbar-inner">
+        <NavLink to={{ pathname: "/", search }} className="brand" aria-label="Abou Camara, tableau de bord Olist">
+          <Mark />
+          <span className="brand-text">
+            <strong>Abou Camara</strong>
+            <span>Olist · Analyse e-commerce</span>
+          </span>
+        </NavLink>
+        <nav className="nav" aria-label="Pages">
+          {PAGES.map(({ path, title }) => (
+            <NavLink key={path} to={{ pathname: path, search }} end>
+              {title}
+            </NavLink>
+          ))}
+        </nav>
+        <a className="button button-dark nav-cta" href={PORTFOLIO}>
+          Portfolio
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </a>
       </div>
-    </aside>
+    </header>
   );
 }
 
-function Logo() {
+function SiteFooter() {
   return (
-    <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-      <path d="M17 2 32 17 17 32 2 17Z" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M17 2 32 17 17 17Z" fill="var(--accent)" opacity="0.9" />
-      <path d="M2 17 17 17 17 32Z" fill="var(--accent-strong)" opacity="0.6" />
+    <footer className="site-footer">
+      <div className="site-footer-inner">
+        <div className="site-footer-top">
+          <div className="site-footer-brand">
+            <Mark />
+            <div>
+              <strong>Abou Camara</strong>
+              <p>Analyste de données. Je transforme les données d'une boutique en ligne en décisions claires.</p>
+            </div>
+          </div>
+          <a className="button button-light" href={PORTFOLIO}>
+            Voir le portfolio
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </a>
+        </div>
+        <p className="site-footer-credits">
+          Données : Olist, « Brazilian E-Commerce Public Dataset » (Kaggle, CC BY-NC-SA 4.0). Carte : @svg-maps/brazil
+          (CC BY 4.0). Montants en réais (R$).
+        </p>
+        <div className="wordmark" aria-hidden="true">Olist</div>
+      </div>
+    </footer>
+  );
+}
+
+/** Monogramme du portfolio : « A » et étoile. */
+function Mark() {
+  return (
+    <svg className="mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M30.2 5L33 10.6L16.8 55H13.2ZM30.2 5H35.8L52.8 55H43.6ZM22.9 37.2H39V40H21.9ZM9 53.6H21.2V56H9ZM38.6 53.6H57.4V56H38.6Z"
+      />
+      <path className="mark-star" d="M26 42.4Q26.6 47.1 31.3 47.7Q26.6 48.3 26 53Q25.4 48.3 20.7 47.7Q25.4 47.1 26 42.4Z" />
     </svg>
   );
 }

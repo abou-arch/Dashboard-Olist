@@ -1,5 +1,5 @@
-// Squelette commun des pages : en-tête (titre, filtres, profil), chargement,
-// erreurs, sélection vide et pied de page.
+// Squelette commun des pages : en-tête (titre, filtres), chargement, erreurs
+// et sélection vide.
 import type { ReactNode } from "react";
 
 import type { PageData } from "../lib/api";
@@ -12,12 +12,14 @@ export type Loaded<T> = PageData<T> & T;
 
 interface Props<T> {
   title: string;
+  /** Seconde partie du titre, en ton adouci (comme sur le portfolio). */
+  lead: string;
   intro: string;
   state: PageState<T>;
   children: (data: Loaded<T>) => ReactNode;
 }
 
-export function Page<T>({ title, intro, state, children }: Props<T>) {
+export function Page<T>({ title, lead, intro, state, children }: Props<T>) {
   const data = state.data;
   let body: ReactNode;
   if (state.status === "error" && !data) {
@@ -39,29 +41,19 @@ export function Page<T>({ title, intro, state, children }: Props<T>) {
     <div className="page">
       {state.status === "loading" && <div className="loading-bar" role="progressbar" aria-label="Chargement" />}
       <header className="page-header">
-        <div>
-          <h1>{title}</h1>
-          <p>{intro}</p>
-        </div>
-        <div className="header-tools">
-          <div className="filters">
+        <span className="eyebrow">Olist · Brésil 2016–2018</span>
+        <h1>
+          {title}. <span>{lead}</span>
+        </h1>
+        <div className="page-header-row">
+          <p>{intro}.</p>
+          <div className="filters" role="group" aria-label="Filtres">
             <PeriodFilter />
             <StatesFilter />
           </div>
-          <div className="profile" aria-label="Auteur du tableau de bord">
-            <span className="avatar" aria-hidden="true">AC</span>
-            <div>
-              <strong>Abou Camara</strong>
-              <span>Analyste de données</span>
-            </div>
-          </div>
         </div>
       </header>
-      {body}
-      <footer className="footer">
-        Données : Olist, « Brazilian E-Commerce Public Dataset » (Kaggle, CC BY-NC-SA 4.0). Carte : @svg-maps/brazil
-        (CC BY 4.0). Montants en réais (R$).
-      </footer>
+      <div className="page-body">{body}</div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// Tuile d'indicateur (maquette) : titre, écart, icône, valeur, petite courbe ou barres.
+// Tuile d'indicateur : titre, écart, icône, valeur, petite courbe ou barres.
 import { ArrowDownRight, ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
 
 import { useId } from "react";

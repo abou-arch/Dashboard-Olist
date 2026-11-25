@@ -1,5 +1,5 @@
 // Couleurs des graphiques, lues dans les variables CSS (styles.css) : le thème
-// sombre est défini à un seul endroit.
+// est défini à un seul endroit.
 import { useMemo } from "react";
 
 export interface Tokens {

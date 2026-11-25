@@ -16,7 +16,7 @@ export function Products() {
   const { filters } = useFilters();
   const state = usePageData<ProductsData>("products", filters);
   return (
-    <Page title="Produits" intro="Catégories et vendeurs de la place de marché" state={state}>
+    <Page title="Produits" lead="Ce qui se vend le mieux." intro="Catégories et vendeurs de la place de marché" state={state}>
       {(data) => <Content data={data} />}
     </Page>
   );
