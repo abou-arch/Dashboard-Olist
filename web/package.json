@@ -14,13 +14,13 @@
     "@fontsource-variable/dm-sans": "5.3.0",
     "@svg-maps/brazil": "2.0.0",
     "echarts": "6.1.0",
-    "lucide-react": "1.47.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "lucide-react": "1.79.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-router": "7.18.4"
   },
   "devDependencies": {
-    "@types/react": "19.3.0",
+    "@types/react": "19.3.1",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
